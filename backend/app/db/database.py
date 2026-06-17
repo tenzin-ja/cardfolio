@@ -1,17 +1,31 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./cardfolio.db"
 
+# This is the path to our SQLite database file.
+# The "./cards.db" part means the database file will be created inside the backend folder.
+SQLALCHEMY_DATABASE_URL = "sqlite:///./cards.db"
+
+
+# The engine is the main connection point between SQLAlchemy and the database.
+# connect_args={"check_same_thread": False} is needed for SQLite when using FastAPI.
 engine = create_engine(
-    DATABASE_URL,
+    SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False}
 )
 
+
+# SessionLocal creates database sessions.
+# A session is like a temporary conversation with the database:
+# we can add, read, update, or delete data through it.
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
 )
 
+
+# Base is the parent class that our database models inherit from.
+# For example, our Card model inherits from Base.
+# This lets SQLAlchemy track which tables it needs to create.
 Base = declarative_base()

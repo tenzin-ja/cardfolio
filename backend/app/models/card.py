@@ -14,3 +14,4 @@ class Card(Base):
     rarity = Column(String, nullable=True)
     condition = Column(String, nullable=True)
     price = Column(Float, nullable=True)
+
