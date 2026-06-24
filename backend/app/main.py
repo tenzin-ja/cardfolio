@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import Base, engine,SessionLocal
@@ -46,3 +46,37 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
 
     # Return the saved card
     return db_card
+"""
+When someone sends a GET request to /cards,
+query the database for all saved card records,
+then return them as a list using CardResponse.
+"""
+@app.get("/cards", response_model=list[CardResponse])
+def get_cards(db: Session = Depends(get_db)):
+    # Query the database for all Card rows.
+    cards = db.query(Card).all()
+
+    # Return the list of cards.
+    return cards
+
+"""
+When someone sends a GET request to /cards/{card_id},
+search the database for one card with that id,
+then return the matching card.
+"""
+@app.get("/cards/{card_id}", response_model=CardResponse)
+def get_card(card_id: int, db: Session = Depends(get_db)):
+
+    card = db.query(Card).filter(Card.id == card_id).first()
+    #if card isn't found throw error
+    if card is None:
+        raise HTTPException(status_code = 404, detail="Card not found")
+    return card
+
+"""
+When someone sends a DELETE request to /cards/{card_id},
+search the database for one card with that id,
+then delete the matching card.
+"""
+@app.delete("/cards/{card_id}")
+def delete_card(card_id: int, db: Session = Depends(get_db)):
