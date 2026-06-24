@@ -80,3 +80,11 @@ then delete the matching card.
 """
 @app.delete("/cards/{card_id}")
 def delete_card(card_id: int, db: Session = Depends(get_db)):
+    card = db.query(Card).filter(Card.id == card_id).first()
+
+    if card is none:
+            raise HTTPException(status_code = 404, detail="Card not found")
+    
+    db.delete(card)
+    db.commit
+    return {"message": "Card deleted successfully"}
