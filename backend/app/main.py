@@ -82,18 +82,40 @@ def get_card(card_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code = 404, detail="Card not found")
     return card
 
-"""
-When someone sends a DELETE request to /cards/{card_id},
-search the database for one card with that id,
-then delete the matching card.
-"""
+
 @app.delete("/cards/{card_id}")
 def delete_card(card_id: int, db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.id == card_id).first()
-
+    """
+    When someone sends a DELETE request to /cards/{card_id},
+    search the database for one card with that id,
+    then delete the matching card.
+    """
     if card is None:
             raise HTTPException(status_code = 404, detail="Card not found")
     
     db.delete(card)
     db.commit
     return {"message": "Card deleted successfully"}
+
+@app.patch("/cards/{card_id}", response_model=CardResponse)
+def update_card(card_id: int, updated_card: CardCreate, db: Session = Depends(get_db)):
+    """
+    When someone sends a PATCH request to /cards/{card_id},
+    search the database for one card with that id,
+    then update only the fields that were provided.
+    """
+    card = db.query(Card).filter(Card.id == card_id).first()
+    
+    if card is None:
+        raise HTTPException(status_code = 404, detial = "Card not Found")
+    #Only grab the fields the user actually sent. Doesn't change fields not mentioned 
+    update_data = updated_card.model_dump(exclude_unset = True)
+
+    for key, value in update_data.items():
+        setattr(card,key,value)
+    
+    db.commit()
+    db.refresh(card)
+
+    return card
