@@ -91,7 +91,7 @@ then delete the matching card.
 def delete_card(card_id: int, db: Session = Depends(get_db)):
     card = db.query(Card).filter(Card.id == card_id).first()
 
-    if card is none:
+    if card is None:
             raise HTTPException(status_code = 404, detail="Card not found")
     
     db.delete(card)
