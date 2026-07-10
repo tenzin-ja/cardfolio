@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.card import Card
-from app.schemas.card import CardCreate, CardResponse
-
+from app.schemas.card import CardCreate, CardUpdate, CardResponse
 
 # Creates a router that will hold all card-related API routes.
 router = APIRouter()
@@ -69,7 +68,8 @@ def get_card(card_id: int, db: Session = Depends(get_db)):
 @router.patch("/cards/{card_id}", response_model=CardResponse)
 def update_card(
     card_id: int,
-    updated_card: CardCreate,
+    #CardUpdate validates the incoming data before it is applied to the database Card object.
+    updated_card: CardUpdate,
     db: Session = Depends(get_db)
 ):
     """
