@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.db.database import SessionLocal
+from app.db.database import get_db
 from app.models.card import Card
 from app.schemas.card import CardCreate, CardResponse
 
@@ -9,21 +9,6 @@ from app.schemas.card import CardCreate, CardResponse
 # Creates a router that will hold all card-related API routes.
 router = APIRouter()
 
-
-# Gives each API request its own database session.
-"""
-Function creates a new session everytime its called
-Session opens before each new api request, then closes afterwards.
-
-"""
-def get_db():
-    db = SessionLocal()
-
-    #after creating new session, stays open until request is finished in route using yield, then closes
-    try:
-        yield db
-    finally:
-        db.close()
 
 #Creates the API route when someone sends a POST request to /cards
 @router.post("/cards", response_model=CardResponse)
