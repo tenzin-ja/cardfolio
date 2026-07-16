@@ -34,36 +34,22 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
     return db_card
 
 
+
+
 @router.get("/cards", response_model=list[CardResponse])
-def get_cards(db: Session = Depends(get_db)):
+def get_card(name: str | None = None, db: Session = Depends(get_db)):
     """
     When someone sends a GET request to /cards,
     query the database for all saved card records,
     then return them as a list using CardResponse.
     """    
-    # Query the database for all Card rows.
-    cards = db.query(Card).all()
-
-    # Return the list of cards.
-    return cards
-
-
-@router.get("/cards/{card_id}", response_model=CardResponse)
-def get_card(card_id: int, db: Session = Depends(get_db)):
-    """
-    When someone sends a GET request to /cards,
-    query the database for all saved card records,
-    then return them as a list using CardResponse.
-    """    
-    card = db.query(Card).filter(Card.id == card_id).first()
-    # Query the database for all Card rows.
-
-    if card is None:
-        raise HTTPException(status_code=404, detail="Card not found")
-    # Return the list of cards.
-
-    return card
-
+    #starts a db query
+    query = db.query(Card)
+    #if user provides a name, then add filter
+    if name is not None:
+        query = query.filter(Card.name.ilike(f"%{name}%"))
+    #runs the query and returns the matching card
+    return query.all()
 
 @router.patch("/cards/{card_id}", response_model=CardResponse)
 def update_card(
