@@ -35,7 +35,6 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
 
 
 
-
 @router.get("/cards", response_model=list[CardResponse])
 def get_card(name: str | None = None, db: Session = Depends(get_db)):
     """
@@ -86,6 +85,8 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
     search the database for one card with that id,
     then delete the matching card.
     """
+    card = db.query(Card).filter(Card.id == card_id).first()
+
     if card is None:
             raise HTTPException(status_code = 404, detail="Card not found")
     
