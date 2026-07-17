@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -34,9 +34,13 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
     return db_card
 
 
-
+#skip = number of cards to ignore
+#limit = maximum number of cards returned
 @router.get("/cards", response_model=list[CardResponse])
-def get_card(name: str | None = None, db: Session = Depends(get_db)):
+def get_card(name: str | None = None, 
+    skip: int = Query(default = 0, ge = 0),
+    limit: int = Query(default = 20, ge = 1, le = 100),
+    db: Session = Depends(get_db)):
     """
     When someone sends a GET request to /cards,
     query the database for all saved card records,
@@ -48,7 +52,7 @@ def get_card(name: str | None = None, db: Session = Depends(get_db)):
     if name is not None:
         query = query.filter(Card.name.ilike(f"%{name}%"))
     #runs the query and returns the matching card
-    return query.all()
+    return query.offset(skip).limit(limit).all()
 
 @router.patch("/cards/{card_id}", response_model=CardResponse)
 def update_card(
