@@ -37,14 +37,15 @@ def create_card(card: CardCreate, db: Session = Depends(get_db)):
 #skip = number of cards to ignore
 #limit = maximum number of cards returned
 @router.get("/cards", response_model=list[CardResponse])
-def get_card(name: str | None = None, 
-    skip: int = Query(default = 0, ge = 0),
+def get_cards(
+    name: str | None = None,
     limit: int = Query(default = 20, ge = 1, le = 100),
-    db: Session = Depends(get_db)):
+    db: Session = Depends(get_db)
+):
     """
     When someone sends a GET request to /cards,
-    query the database for all saved card records,
-    then return them as a list using CardResponse.
+    query the database with optional name filtering. 
+    Returns a "limit" number of cards back
     """    
     #starts a db query
     query = db.query(Card)
@@ -52,7 +53,7 @@ def get_card(name: str | None = None,
     if name is not None:
         query = query.filter(Card.name.ilike(f"%{name}%"))
     #runs the query and returns the matching card
-    return query.offset(skip).limit(limit).all()
+    return query.limit(limit).all()
 
 @router.patch("/cards/{card_id}", response_model=CardResponse)
 def update_card(
