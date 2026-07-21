@@ -42,9 +42,13 @@ def test_read_root():
     '''
     check that the backend root route is running correctly.
     '''
+
+    #recieves simulated get request from the get route. response saves all info from request
     response = client.get("/")
 
+    #checks the http status code, 200 meaning the request suceeded.
     assert response.status_code == 200
+    
     assert response.json() == {
         "message": "Cardfolio backend is running"
     }
@@ -85,3 +89,19 @@ def test_get_cards():
     assert isinstance(data,list)
     assert len(data) > 0
     assert data[0]["name"] == "Pikachu"
+
+def test_create_card_with_negative_price():
+    """
+    Check that a card cannot be created with a negative price.
+    """
+    response = client.post(
+        "/cards",
+        json={
+            "name": "Invalid Card",
+            "rarity": "Common",
+            "condition": "Near Mint",
+            "price": -10
+        }
+    )
+
+    assert response.status_code == 422
