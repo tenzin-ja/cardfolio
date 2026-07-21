@@ -70,7 +70,7 @@ def update_card(
     card = db.query(Card).filter(Card.id == card_id).first()
     
     if card is None:
-        raise HTTPException(status_code = 404, detial = "Card not Found")
+        raise HTTPException(status_code = 404, detail = "Card not Found")
     #Only grab the fields the user actually sent. Doesn't change fields not mentioned 
     update_data = updated_card.model_dump(exclude_unset = True)
 
@@ -96,5 +96,5 @@ def delete_card(card_id: int, db: Session = Depends(get_db)):
             raise HTTPException(status_code = 404, detail="Card not found")
     
     db.delete(card)
-    db.commit
+    db.commit()
     return {"message": "Card deleted successfully"}

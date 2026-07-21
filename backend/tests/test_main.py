@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
-from sqlalchemny import create_engine
-from sqlalchemy import sessionmaker
-from sqlalchemy import StaticPool
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.db.database import Base, get_db
 from app.main import app
@@ -71,3 +71,17 @@ def test_create_card():
     assert data["condition"] == "Near Mint"
     assert data["price"] == 25.50
     assert "id" in data
+
+def test_get_cards():
+    """
+    Check that saved ards can be retrieved.
+    """
+    response = client.get("/cards")
+    
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert isinstance(data,list)
+    assert len(data) > 0
+    assert data[0]["name"] == "Pikachu"
