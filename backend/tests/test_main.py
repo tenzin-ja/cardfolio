@@ -48,7 +48,7 @@ def test_read_root():
 
     #checks the http status code, 200 meaning the request suceeded.
     assert response.status_code == 200
-    
+
     assert response.json() == {
         "message": "Cardfolio backend is running"
     }
@@ -105,3 +105,35 @@ def test_create_card_with_negative_price():
     )
 
     assert response.status_code == 422
+
+def test_update_card():
+    """Check that an existing card can be updated."""
+
+    # Create a card specifically for this test.
+    create_response = client.post(
+        "/cards",
+        json={
+            "name": "Bulbasaur",
+            "rarity": "Common",
+            "condition": "Good",
+            "price": 10.00
+        }
+    )
+
+    card_id = create_response.json()["id"]
+
+    # Update only the price.
+    response = client.patch(
+        f"/cards/{card_id}",
+        json={
+            "price": 15.00
+        }
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == card_id
+    assert data["name"] == "Bulbasaur"
+    assert data["price"] == 15.00
