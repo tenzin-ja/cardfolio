@@ -117,6 +117,34 @@ def test_get_cards():
     assert len(data) == 1
     assert data[0]["name"] == "Pikachu"
 
+def test_get_cards_filters_by_partial_case_insensitive_name():
+    """Return only cards matching a partial name, regardless of case."""
+
+    pikachu_response = client.post(
+        "/cards",
+        json={"name": "Pikachu"}
+    )
+    charmander_response = client.post(
+        "/cards",
+        json={"name": "Charmander"}
+    )
+
+    assert pikachu_response.status_code == 200
+    assert charmander_response.status_code == 200
+
+    response = client.get(
+        "/cards",
+        params={"name": "PIKA"}
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["name"] == "Pikachu"
+
+
 def test_create_card_with_negative_price():
     """
     Check that a card cannot be created with a negative price.
