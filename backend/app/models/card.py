@@ -6,7 +6,6 @@ from app.db.database import Base
 
 # Creating a Card class that inherits properties from Base
 # Card model is how a card will be stored in SQLite
-#test
 class Card(Base):
     __tablename__ = "cards"
 

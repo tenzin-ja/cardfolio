@@ -30,16 +30,16 @@ The backend currently supports:
 
 ```text
 cardfolio/
-â”œâ”€â”€ backend/
-â”‚   â”œâ”€â”€ app/
-â”‚   â”‚   â”œâ”€â”€ db/          # Database connection and sessions
-â”‚   â”‚   â”œâ”€â”€ models/      # SQLAlchemy database models
-â”‚   â”‚   â”œâ”€â”€ routers/     # Card API routes
-â”‚   â”‚   â”œâ”€â”€ schemas/     # Pydantic request and response schemas
-â”‚   â”‚   â””â”€â”€ main.py      # FastAPI application entry point
-â”‚   â”œâ”€â”€ tests/           # API tests
-â”‚   â””â”€â”€ requirements.txt
-â””â”€â”€ README.md
+├── backend/
+│   ├── app/
+│   │   ├── db/          # Database connection and sessions
+│   │   ├── models/      # SQLAlchemy database models
+│   │   ├── routers/     # Card API routes
+│   │   ├── schemas/     # Pydantic request and response schemas
+│   │   └── main.py      # FastAPI application entry point
+│   ├── tests/           # API tests
+│   └── requirements.txt
+└── README.md
 ```
 
 ## API Endpoints
@@ -118,7 +118,7 @@ updates, and rejection of negative prices.
 
 - Expand tests for filtering, deletion, and error responses
 - Add full pagination for larger collections
-- Integrate external PokÃ©mon card data and search
+- Integrate external Pokémon card data and search
 - Build the collection dashboard and frontend
 - Add user accounts and authentication
 - Move from local SQLite storage to PostgreSQL for deployment
