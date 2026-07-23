@@ -23,6 +23,20 @@ TestingSessionLocal = sessionmaker(
 #Create the card table insde the test datebase
 Base.metadata.create_all(bind = test_engine)
 
+@pytest.fixture(autouse=True)
+def reset_test_database():
+    """
+    Start every test with a fresh, empty database.
+    """
+
+    #deletes the old test tables and creates fresh empty ones.
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+
+    yield
+    #deletes everything again
+    Base.metadata.drop_all(bind=test_engine)
+
 # Replace the real database session with the test database session.
 def override_get_db():
     db = TestingSessionLocal()
@@ -78,17 +92,29 @@ def test_create_card():
     assert "id" in data
 
 def test_get_cards():
-    """
-    Check that saved ards can be retrieved.
-    """
+    """Check that saved cards can be retrieved."""
+
+    # Create the card needed for this specific test.
+    create_response = client.post(
+        "/cards",
+        json={
+            "name": "Pikachu",
+            "rarity": "Rare",
+            "condition": "Near Mint",
+            "price": 25.50
+        }
+    )
+
+    assert create_response.status_code == 200
+
     response = client.get("/cards")
-    
+
     assert response.status_code == 200
 
     data = response.json()
 
-    assert isinstance(data,list)
-    assert len(data) > 0
+    assert isinstance(data, list)
+    assert len(data) == 1
     assert data[0]["name"] == "Pikachu"
 
 def test_create_card_with_negative_price():
