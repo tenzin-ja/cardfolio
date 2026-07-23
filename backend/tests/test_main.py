@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -137,3 +138,37 @@ def test_update_card():
     assert data["id"] == card_id
     assert data["name"] == "Bulbasaur"
     assert data["price"] == 15.00
+
+def test_delete_card():
+    """Check that an existing card can be deleted."""
+    
+    # Create a card specifically for this test.
+    create_response = client.post(
+        "/cards",
+        json={
+            "name": "Squirtle",
+            "rarity": "Common",
+            "condition": "Good",
+            "price": 12.00
+        }
+    )
+
+    assert create_response.status_code == 200
+
+    card_id = create_response.json()["id"]
+
+    # Delete the card.
+    delete_response = client.delete(f"/cards/{card_id}")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {
+        "message": "Card deleted successfully"
+    }
+
+    # Deleting it again should return 404 because it no longer exists.
+    second_delete_response = client.delete(f"/cards/{card_id}")
+
+    assert second_delete_response.status_code == 404
+    assert second_delete_response.json() == {
+        "detail": "Card not found"
+    }
