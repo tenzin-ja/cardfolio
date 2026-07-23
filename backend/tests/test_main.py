@@ -144,6 +144,19 @@ def test_get_cards_filters_by_partial_case_insensitive_name():
     assert len(data) == 1
     assert data[0]["name"] == "Pikachu"
 
+@pytest.mark.parametrize("invalid_limit", [0, 101])
+def test_get_cards_rejects_limit_outside_allowed_range(invalid_limit):
+    """
+    The API only permits limits from 1 through 100.
+
+    Parametrization runs this test once for each invalid value.
+    """
+    response = client.get(
+        "/cards",
+        params={"limit": invalid_limit}
+    )
+
+    assert response.status_code == 422
 
 def test_create_card_with_negative_price():
     """
