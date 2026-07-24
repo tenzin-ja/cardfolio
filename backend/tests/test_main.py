@@ -276,3 +276,26 @@ def test_update_missing_card_returns_404():
     assert response.json() == {
         "detail" : "Card not Found"
     }
+
+def test_update_card_rejects_null_name():
+    """A PATCH may omit the name, but it cannot explicitly erase the name."""
+
+    create_response = client.post(
+        "/cards",
+        json={"name": "Pikachu"}
+    )
+
+    assert create_response.status_code == 200
+
+    card_id = create_response.json()["id"]
+
+    response = client.patch(
+        f"/cards/{card_id}",
+        json={"name": None}
+    )
+
+    assert response.status_code == 422
+
+    # Confirm that the rejected update did not alter the saved card.
+    get_response = client.get("/cards")
+    assert get_response.json()[0]["name"] == "Pikachu"

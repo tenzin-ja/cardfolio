@@ -1,5 +1,4 @@
-from pydantic import BaseModel, ConfigDict,Field
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 '''
 The new Field rules mean:
 
@@ -28,6 +27,17 @@ class CardUpdate(CardBase):
     condition: str | None = Field(default=None, max_length=50)
     price: float | None = Field(default=None, ge=0)
 
+    @field_validator("name")
+    @classmethod
+    def reject_null_name(cls, value: str | None) -> str:
+        """
+        PATCH may omit the name, but explicitly sending null would erase
+        a value that every saved card is required to have.
+        """
+        if value is None:
+            raise ValueError("Name cannot be null")
+
+        return value
 
 class CardResponse(CardBase):
     id: int
