@@ -274,5 +274,5 @@ def test_update_missing_card_returns_404():
 
     assert response.status_code == 404
     assert response.json() == {
-        "detail" : "Card not found"
+        "detail" : "Card not Found"
     }
