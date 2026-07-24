@@ -263,3 +263,16 @@ def test_delete_card():
     assert second_delete_response.json() == {
         "detail": "Card not found"
     }
+
+def test_update_missing_card_returns_404():
+    """Updating a nonexistent card should return a consisten 404 response."""
+
+    response = client.patch(
+        "/cards/999999",
+        json = {"price" : 15.00}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail" : "Card not found"
+    }
