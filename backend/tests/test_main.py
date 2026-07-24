@@ -158,6 +158,30 @@ def test_get_cards_rejects_limit_outside_allowed_range(invalid_limit):
 
     assert response.status_code == 422
 
+def test_get_cards_respects_valid_limit():
+    """Return no more cards than the requested limit"""
+
+    for card_name in ["Pikachu", "Charmander"]:
+        create_response = client.post(
+            "/cards",
+            json={"name": card_name}
+        )
+        assert create_response.status_code == 200
+
+    response = client.get(
+        "/cards",
+        params = {"limit" : 1}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    #We only check the count because teh endpoint does not define a sorting order yet
+    assert len(data) == 1
+
+
+        
+
 def test_create_card_with_negative_price():
     """
     Check that a card cannot be created with a negative price.
