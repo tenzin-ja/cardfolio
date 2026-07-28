@@ -1,20 +1,36 @@
+import os
+from pathlib import Path
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 
-# This is the path to our SQLite database file.
-# The "./cards.db" part means the database file will be created inside the backend folder.
-SQLALCHEMY_DATABASE_URL = "sqlite:///./cards.db"
+# Build the default path from this source file so starting Python from a
+# different working directory cannot accidentally create another database.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+DEFAULT_DATABASE_PATH = BACKEND_DIR / "cards.db"
+DEFAULT_DATABASE_URL = f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
 
+# Tests and deployed environments can provide their own database without
+# changing application code.
+SQLALCHEMY_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    DEFAULT_DATABASE_URL,
+)
 
+# SQLite needs this option for FastAPI requests that may use different threads.
+# Other databases, such as PostgreSQL, do not accept this SQLite-only setting.
+connect_args = (
+    {"check_same_thread": False}
+    if SQLALCHEMY_DATABASE_URL.startswith("sqlite")
+    else {}
+)
 
-
-# The engine is the main connection point between SQLAlchemy and the database.
-# connect_args={"check_same_thread": False} is needed for SQLite when using FastAPI.
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    connect_args=connect_args,
 )
+
 
 
 # SessionLocal creates database sessions.
