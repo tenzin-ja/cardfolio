@@ -16,5 +16,5 @@ def read_root():
     return {"message": "Cardfolio backend is running"}
 
 
-# Connect the card routes to the main FastAPI application.
+# Connect the card routes to the main FastAPI application
 app.include_router(cards.router)
