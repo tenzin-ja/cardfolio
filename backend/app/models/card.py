@@ -10,7 +10,8 @@ class Card(Base):
     __tablename__ = "cards"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=True, index=True)
+    # Every stored card must have a name, so the database rejects NULL values.
+    name = Column(String, nullable=False, index=True)
     rarity = Column(String, nullable=True)
     condition = Column(String, nullable=True)
     price = Column(Float, nullable=True)
