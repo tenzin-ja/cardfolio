@@ -77,7 +77,7 @@ def run_migrations_online() -> None:
             connection=connection, target_metadata=target_metadata,
             # SQLite cannot directly alter most columns. Batch mode lets Alembic 
             # rebuild the table while preserving its existing data.
-            render_as_batch = True,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():
