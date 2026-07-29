@@ -123,6 +123,31 @@ def test_get_cards():
     assert len(data) == 1
     assert data[0]["name"] == "Pikachu"
 
+def test_get_card_by_id():
+    """Retrieve the exact card matching the requested ID."""
+    create_response = client.post(
+        "/cards",
+        json={"name": "Eevee"}
+    )
+    assert create_response.status_code == 200
+
+    card_id = create_response.json()["id"]
+    response = client.get(f"/cards/{card_id}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == card_id
+    assert response.json()["name"] == "Eevee"
+
+
+def test_get_missing_card_returns_404():
+    """Return 404 when the requested card ID does not exist."""
+    response = client.get("/cards/999999")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Card not found"
+    }
+
 def test_get_cards_filters_by_partial_case_insensitive_name():
     """Return only cards matching a partial name, regardless of case."""
 
