@@ -1,12 +1,6 @@
 from fastapi import FastAPI
 
-from app.db.database import Base, engine
 from app.routers import cards
-
-
-# Create database tables.
-Base.metadata.create_all(bind=engine)
-
 
 app = FastAPI()
 
