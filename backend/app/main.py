@@ -5,7 +5,7 @@ from app.routers import cards
 # Create database tables.
 Base.metadata.create_all(bind=engine)
 
-
+#create app
 app = FastAPI()
 
 
