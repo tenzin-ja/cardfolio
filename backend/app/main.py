@@ -2,10 +2,7 @@ from fastapi import FastAPI
 
 from app.routers import cards
 
-# Create database tables.
-Base.metadata.create_all(bind=engine)
-
-#create app
+#Create FastAPI app
 app = FastAPI()
 
 
