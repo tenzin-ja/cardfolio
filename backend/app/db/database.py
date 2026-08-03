@@ -8,6 +8,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Build the default path from this source file so starting Python from a
 # different working directory cannot accidentally create another database.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+#Finds the database
 DEFAULT_DATABASE_PATH = BACKEND_DIR / "cards.db"
 DEFAULT_DATABASE_URL = f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
 
@@ -26,6 +27,8 @@ connect_args = (
     else {}
 )
 
+
+#Creates engine to manage connections 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args=connect_args,
@@ -58,5 +61,6 @@ def get_db():
 
 # Base is the parent class that our database models inherit from.
 # For example, our Card model inherits from Base.
-# This lets SQLAlchemy track which tables it needs to create.
+
+# Acts as a marker on models for database table
 Base = declarative_base()
