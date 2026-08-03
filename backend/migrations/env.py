@@ -2,7 +2,11 @@ from app.db.database import Base, SQLALCHEMY_DATABASE_URL
 
 # Importing the model registers its table with Base.metadata.
 # Alembic cannot detect a model that Python has never imported.
+
+#import card model
 from app.models.card import Card
+#import catalog card model 
+from app.models.catalog_card import CatalogCard
 
 from logging.config import fileConfig
 
