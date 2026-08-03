@@ -1,82 +1,82 @@
 # Cardfolio Project Status
 
-Last updated: 2026-07-29
-Last environment: Work Windows desktop
+Last updated: 2026-08-03
+Last environment: Windows desktop
 Branch: `main`
-Last completed code commit before this handoff: `b1a2f03`
-Roadmap position: Backend Foundation is complete enough to begin the Portfolio
-Data Model; stable collection ordering and pagination remain future retrieval
-work.
+Roadmap position: The Portfolio Data Model is underway. The initial
+`CatalogCard` model and migration are complete; `CardVariant` is next.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
-  delete card endpoints
+  delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Thirteen test functions covering fourteen cases with an isolated in-memory
+- Fourteen test functions covering fifteen cases with an isolated in-memory
   database
-- Local SQLite files excluded from Git
-- Predictable SQLite path with a `DATABASE_URL` override
-- Alembic `1.18.5` configured as the only application-schema manager
-- Two migrations: the initial `cards` table and required card names
-- Existing development database is tracked locally at Alembic head
-- Cross-platform Git line endings configured for Windows and macOS
+- Alembic `1.18.5` is the only application-schema manager
+- Three migrations: initial `cards`, required card names, and `catalog_cards`
+- Development database is at revision `64e710e11ea7 (head)`
+- Existing `Card` table and data were preserved while `catalog_cards` was added
+- Local SQLite files are excluded from Git
 
 ## Completed This Session
 
-- Verified that the existing `cards.db` schema matched the initial migration
-- Stamped the existing database at revision `1b5368fe8921`
-- Removed import-time `Base.metadata.create_all()` from the FastAPI application
-- Configured Alembic batch mode for SQLite column changes
-- Changed `Card.name` to `nullable=False`
-- Generated and applied revision `d5ee3bb4be7f` to require card names
-- Added `GET /cards/{card_id}` for backend retrieval of one exact card
-- Added successful and missing-card tests for exact-ID retrieval
-- Clarified that users will search by meaningful card information; internal IDs
-  are used by the frontend after a user selects a result
+- Repaired a merge regression that restored import-time table creation
+- Kept schema creation under Alembic by removing
+  `Base.metadata.create_all()` from the FastAPI application
+- Designed and added the initial `CatalogCard` SQLAlchemy model
+- Added provider-scoped external identity with a composite unique constraint
+- Added catalog identity, set information, image metadata, and nullable
+  reference-price fields
+- Defined the initial reference price as a raw Near Mint estimate with explicit
+  variant, source, observation time, and currency metadata
+- Generated, reviewed, and applied revision `64e710e11ea7`
+- Added a database-level test proving duplicate provider identities are rejected
 
 ## Verification
 
-- `python -m pytest`: 14 passed
-- `alembic current`: `d5ee3bb4be7f (head)`
-- SQLite reports `cards.name` with `notnull = 1`
-- All 6 existing development cards were preserved
-- Existing null-name count: 0
+- `python -m pytest`: 15 passed
+- `alembic current`: `64e710e11ea7 (head)`
+- SQLAlchemy metadata contains both `cards` and `catalog_cards`
+- Alembic detected only the expected new table and name index before migration
+- The catalog migration does not alter or delete the existing `cards` table
 
 ## V1 Decisions
 
 - Support Pokemon cards only in V1
 - Support raw/ungraded cards; graded cards are postponed
-- Store condition but do not invent automatic condition-based price adjustments
-- Use Pokemon TCG API catalog data and TCGplayer-derived reference prices
+- Import catalog cards on demand from the Pokemon TCG API
+- Use TCGplayer-derived prices as reference values
+- Treat a catalog reference price as a shared raw Near Mint baseline
+- Store an owned card's condition without overwriting the shared catalog price
+- Do not invent automatic condition-based price adjustments
 - Show eBay active listings later as comparisons, not confirmed market value
-- Import catalog cards on demand rather than mirroring the entire external catalog
 - Include registration and private collections before release, while postponing
-  authentication implementation until the core collection workflow is stable
+  authentication until the core collection workflow is stable
 - Do not provide user-facing search by internal database ID
-- Keep AI-assisted condition suggestions and soccer cards as possible later work
 
 ## Active Issues
 
-- The current `Card` table still combines catalog identity and collection data
-- `CatalogCard`, `CardVariant`, `CollectionItem`, `PriceSnapshot`, and `User`
-  models are not yet implemented
+- The temporary `Card` table still combines catalog identity and collection data
+- `CardVariant`, `CollectionItem`, `PriceSnapshot`, and `User` are not implemented
+- Reference pricing currently lives on `CatalogCard`; lasting variant-specific
+  pricing and price history still need to be modeled
+- `CatalogCard` does not yet have Pydantic schemas, routes, or an import service
 - Card-list ordering is not deterministic
-- Offset/cursor pagination is not yet implemented
+- Offset/cursor pagination is not implemented
 - Root and backend dependency declarations need consolidation
-- README and roadmap do not yet reflect all current V1 decisions
-- Exact-ID routes will need to target the lasting catalog and collection models
-  after the data-model split
+- README and roadmap do not reflect all current V1 decisions
 
 ## Exact Next Action
 
-Begin the Portfolio Data Model by agreeing on the responsibilities and initial
-fields for `CatalogCard` and `CollectionItem`. Preserve the existing `Card` table
-until there is an explicit data-migration plan. Add the lasting models and their
-migration in small, separately verified steps.
+Agree on the responsibility and minimal fields for `CardVariant`, including how
+it identifies finishes such as normal, holofoil, and reverse holofoil. Then add
+the model, Alembic registration, migration, and one focused test as separate,
+verified steps.
 
-After the model split, apply deterministic ordering and pagination to the lasting
-collection endpoint rather than expanding the temporary combined `Card` resource.
+Preserve the existing `Card` table and the new `CatalogCard` fields until there
+is an explicit data-migration plan. Do not begin `CollectionItem` until its
+lasting relationship to `CardVariant` is clear.
 
-On a new computer, pull the repository, create/activate the backend virtual
+On a new computer, pull the repository, create or activate the backend virtual
 environment, install backend requirements, and run `alembic upgrade head`.
