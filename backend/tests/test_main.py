@@ -5,12 +5,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.exc import IntegrityError
 
 #The application engine is created while app modules are imported, so this 
 #override must be set before impoting the database or FastApi application
 os.environ["DATABASE_URL"] = "sqlite://"
 
 from app.db.database import Base, get_db
+from app.models.catalog_card import CatalogCard
 from app.main import app
 
 #Create a temp in-memory database used only for tests.
@@ -330,3 +332,37 @@ def test_update_card_rejects_null_name():
     # Confirm that the rejected update did not alter the saved card.
     get_response = client.get("/cards")
     assert get_response.json()[0]["name"] == "Pikachu"
+
+
+def test_catalog_card_rejects_duplicate_provider_identity():
+    """
+    A provider card may be imported only once into the catalog.
+    """
+    first_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    duplicate_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard duplicate",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(first_card)
+        db.commit()
+
+        db.add(duplicate_card)
+
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+        db.rollback()
