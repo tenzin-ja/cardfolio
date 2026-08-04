@@ -8,6 +8,8 @@ from sqlalchemy import(
 )
 
 from app.db.database import Base
+from sqlalchemy.orm import relationship
+
 
 class CatalogCard(Base):
     __tablename__ = "catalog_cards"
@@ -38,3 +40,8 @@ class CatalogCard(Base):
     reference_price_source = Column(String(50), nullable=True)
     reference_price_updated_at = Column(DateTime(timezone=True), nullable=True)
     currency = Column(String(3), nullable=False, default="USD")    
+
+    variants = relationship(
+    "CardVariant",
+    back_populates="catalog_card",
+    )

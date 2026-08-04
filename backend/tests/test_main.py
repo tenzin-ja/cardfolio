@@ -333,7 +333,8 @@ def test_update_card_rejects_null_name():
     get_response = client.get("/cards")
     assert get_response.json()[0]["name"] == "Pikachu"
 
-
+#Testing database rule. Checking SQlite doesn't return a http response when noticing a duplicate.
+#Sqlalchemy should raise integrityerror
 def test_catalog_card_rejects_duplicate_provider_identity():
     """
     A provider card may be imported only once into the catalog.

@@ -7,6 +7,10 @@ from app.db.database import Base, SQLALCHEMY_DATABASE_URL
 from app.models.card import Card
 #import catalog card model 
 from app.models.catalog_card import CatalogCard
+#import card variant model
+from app.models.card_variant import CardVariant
+
+
 
 from logging.config import fileConfig
 
