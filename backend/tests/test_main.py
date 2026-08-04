@@ -13,6 +13,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 
 from app.db.database import Base, get_db
 from app.models.catalog_card import CatalogCard
+from app.models.card_variant import CardVariant
 from app.main import app
 
 #Create a temp in-memory database used only for tests.
@@ -366,4 +367,37 @@ def test_catalog_card_rejects_duplicate_provider_identity():
         with pytest.raises(IntegrityError):
             db.commit()
 
+        db.rollback()
+
+#Testing card variant model. Verifying duplicate variants aren't possible
+def test_card_variant_rejects_duplicate_variant_for_same_catalog_card():
+    first_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    first_variant = CardVariant (
+        catalog_card = first_card,
+        variant_key = "holofoil"
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(first_card)
+        db.commit()
+
+        db.add(first_variant)
+        db.commit()
+        duplicate_variant = CardVariant(
+        catalog_card = first_card,
+        variant_key = "holofoil"
+    )
+
+        db.add(duplicate_variant)
+        
+        with pytest.raises(IntegrityError):
+            db.commit()
         db.rollback()
