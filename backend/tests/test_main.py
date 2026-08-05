@@ -14,6 +14,8 @@ os.environ["DATABASE_URL"] = "sqlite://"
 from app.db.database import Base, get_db
 from app.models.catalog_card import CatalogCard
 from app.models.card_variant import CardVariant
+from app.models.collection_item import CollectionItem
+
 from app.main import app
 
 #Create a temp in-memory database used only for tests.
@@ -418,3 +420,34 @@ def test_card_variant_rejects_missing_catalog_card():
             db.commit()
 
         db.rollback()    
+
+def test_collection_item_can_be_saved():
+
+    first_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    first_variant = CardVariant (
+        catalog_card = first_card,
+        variant_key = "holofoil"
+    )
+
+    collection_item = CollectionItem (
+        card_variant = first_variant,
+        condition = "near_mint"
+    )
+    with TestingSessionLocal() as db:
+            
+            db.add(collection_item)
+            db.commit()
+            db.refresh(collection_item)
+            
+            assert collection_item.id is not None
+            assert collection_item.card_variant_id == first_variant.id
+            assert collection_item.quantity == 1
+            assert collection_item.purchase_currency == "USD"
