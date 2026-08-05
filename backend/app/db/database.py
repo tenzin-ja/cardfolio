@@ -1,8 +1,18 @@
 import os
 from pathlib import Path
+import sqlite3
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+@event.listens_for(Engine, "connect")
+def enable_sqliteforeign_keys(dbapi_connetion, _connection_record):
+    if isinstance(dpai_connection, sqlite3,Connection):
+        cursor = dbpai_connection,cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.close()
+
 
 
 # Build the default path from this source file so starting Python from a
