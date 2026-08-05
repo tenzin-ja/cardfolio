@@ -1,51 +1,61 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 Last environment: Windows desktop
 Branch: `main`
 Roadmap position: The Portfolio Data Model is underway. The initial
-`CatalogCard` and `CardVariant` models and migrations are complete;
-`CollectionItem` is next.
+`CatalogCard`, `CardVariant`, and `CollectionItem` models and migrations are
+complete. Focus now moves to verifying `CollectionItem` rejection rules before
+designing price history.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Fifteen test functions covering sixteen cases with an isolated in-memory
+- Seventeen test functions covering eighteen cases with an isolated in-memory
   database
 - Alembic `1.18.5` is the only application-schema manager
-- Four migrations: initial `cards`, required card names, `catalog_cards`, and
-  `card_variants`
-- Development database is at revision `0eac98a8accb (head)`
-- `CatalogCard` has a one-to-many relationship with `CardVariant`
-- Existing `Card` and `CatalogCard` data were preserved while `card_variants`
-  was added
+- Five migrations: initial `cards`, required card names, `catalog_cards`,
+  `card_variants`, and `collection_items`
+- Development database is at revision `b947a39991a6 (head)`
+- `CatalogCard` has many `CardVariant` rows, and each `CardVariant` can have many
+  owned `CollectionItem` rows
+- SQLite foreign-key enforcement is enabled for development and test
+  connections
+- Existing `Card`, `CatalogCard`, and `CardVariant` data were preserved while
+  `collection_items` was added
 - Local SQLite files are excluded from Git
 
 ## Completed This Session
 
-- Clarified that one `CatalogCard` represents one distinct card printing, not a
-  search term or every card sharing the same name
-- Designed and added the initial `CardVariant` SQLAlchemy model
-- Added the `catalog_card_id` foreign key and lookup index
-- Added a composite unique constraint on `catalog_card_id` and `variant_key`
-- Added bidirectional `CatalogCard.variants` and `CardVariant.catalog_card`
-  relationships
-- Registered `CardVariant` with Alembic
-- Generated, reviewed, and applied revision `0eac98a8accb`
-- Added a database-level test proving one catalog card cannot store the same
-  variant key twice
+- Enabled SQLite foreign-key enforcement through the SQLAlchemy connection hook
+- Added a database test proving a `CardVariant` cannot reference a nonexistent
+  `CatalogCard`
+- Defined `CollectionItem` as an owned lot sharing a variant, condition,
+  quantity, and purchase information
+- Added the initial `CollectionItem` model with price, currency, date, and notes
+  fields
+- Added allowed-condition, positive-quantity, and nonnegative-price database
+  constraints
+- Added the indexed `card_variant_id` foreign key and bidirectional
+  `CardVariant.collection_items` relationship
+- Registered `CollectionItem` with Alembic, then generated, reviewed, and
+  applied revision `b947a39991a6`
+- Added a successful database test covering relationship cascading, generated
+  IDs, and the default quantity and currency
 
 ## Verification
 
-- `python -m pytest`: 16 passed
-- `alembic current`: `0eac98a8accb (head)`
+- `python -m pytest`: 18 passed
+- `alembic current`: `b947a39991a6 (head)`
 - `alembic check`: no new upgrade operations detected
-- SQLAlchemy metadata contains the `card_variants` table, foreign key, composite
-  unique constraint, and catalog-card index
-- Bidirectional relationship mapper check passed
-- The variant migration does not alter or delete existing tables or data
+- Development and test connections report `PRAGMA foreign_keys = 1`
+- The `CardVariant`/`CollectionItem` bidirectional mapper check passed
+- The collection-item migration contains all eight columns, three check
+  constraints, its foreign key, primary key, and lookup index
+- The collection-item migration does not alter or delete existing tables or
+  data
 
 ## V1 Decisions
 
@@ -68,12 +78,15 @@ Roadmap position: The Portfolio Data Model is underway. The initial
 ## Active Issues
 
 - The temporary `Card` table still combines catalog identity and collection data
-- `CollectionItem`, `PriceSnapshot`, and `User` are not implemented
+- `PriceSnapshot` and `User` are not implemented
 - Reference pricing currently lives on `CatalogCard`; lasting variant-specific
   pricing and price history still need to be modeled
-- `CatalogCard` and `CardVariant` do not yet have Pydantic schemas, routes, or an
-  import service
-- SQLite foreign-key enforcement is not explicitly enabled and tested yet
+- `CatalogCard`, `CardVariant`, and `CollectionItem` do not yet have Pydantic
+  schemas, routes, or an import service
+- `CollectionItem` constraint rejection cases are not yet covered by focused
+  tests
+- The condition dropdown will be implemented with the frontend; the database
+  currently enforces its canonical values
 - Card-list ordering is not deterministic
 - Offset/cursor pagination is not implemented
 - Root and backend dependency declarations need consolidation
@@ -81,14 +94,13 @@ Roadmap position: The Portfolio Data Model is underway. The initial
 
 ## Exact Next Action
 
-Verify and explicitly enable SQLite foreign-key enforcement for development and
-test connections. Then agree on the responsibility and minimal fields for
-`CollectionItem`, including its `CardVariant` relationship, condition, quantity,
-and purchase information.
+Add focused database tests for the `CollectionItem` constraints, starting with
+an invalid condition and then covering nonpositive quantity, negative purchase
+price, and a nonexistent `CardVariant`. After those rules are verified, agree on
+the responsibility and minimal fields for `PriceSnapshot`.
 
-Add `CollectionItem`, its Alembic migration, and one focused database test as
-separate, verified steps. Preserve the temporary `Card` table and current
-reference-price fields until there is an explicit data-migration plan.
+Preserve the temporary `Card` table and current reference-price fields until
+there is an explicit data-migration plan.
 
 On a new computer, pull the repository, create or activate the backend virtual
 environment, install backend requirements, and run `alembic upgrade head`.
