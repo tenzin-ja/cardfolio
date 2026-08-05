@@ -6,10 +6,12 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+#registers the function to run whenever any SQLAlchemy engine opens a connection.
 @event.listens_for(Engine, "connect")
-def enable_sqliteforeign_keys(dbapi_connetion, _connection_record):
-    if isinstance(dpai_connection, sqlite3,Connection):
-        cursor = dbpai_connection,cursor()
+def enable_sqliteforeign_keys(dbapi_connection, _connection_record):
+    #ensures the SQLite-only command is not sent to PostgreSQL
+    if isinstance(dbapi_connection, sqlite3,Connection):
+        cursor = dbapi_connection,cursor()
         cursor.execute("PRAGMA foreign_keys = ON")
         cursor.close()
 
