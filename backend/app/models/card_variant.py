@@ -29,3 +29,8 @@ class CardVariant(Base):
         "CatalogCard",
         back_populates="variants",
     )
+
+    collection_items = relationship(
+    "CollectionItem",
+    back_populates="card_variant",
+    )
