@@ -9,7 +9,8 @@ from app.models.card import Card
 from app.models.catalog_card import CatalogCard
 #import card variant model
 from app.models.card_variant import CardVariant
-
+# import collection item model
+from app.models.collection_item import CollectionItem
 
 
 from logging.config import fileConfig
