@@ -406,13 +406,13 @@ def test_card_variant_rejects_duplicate_variant_for_same_catalog_card():
 def test_card_variant_rejects_missing_catalog_card():
 
        
-    first_variant = CardVariant (
+    orphan_variant = CardVariant (
         catalog_card_id = 9999,
         variant_key = "holofoil"
     )
     with TestingSessionLocal() as db:
 
-        db.add(first_variant)
+        db.add(orphan_variant)
 
         with pytest.raises(IntegrityError):
             db.commit()
