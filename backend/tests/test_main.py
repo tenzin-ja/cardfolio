@@ -451,3 +451,34 @@ def test_collection_item_can_be_saved():
             assert collection_item.card_variant_id == first_variant.id
             assert collection_item.quantity == 1
             assert collection_item.purchase_currency == "USD"
+
+def test_collection_item_rejects_invalid_condition():
+    first_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    
+    first_variant = CardVariant (
+        catalog_card = first_card,
+        variant_key = "holofoil"
+    )
+
+    collection_item = CollectionItem (
+        card_variant = first_variant,
+        condition = "perfect"
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(collection_item)
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+        db.rollback()
+
+
+
