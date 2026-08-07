@@ -9,7 +9,7 @@ CardCondition = Literal [
     "near_mint",
     "lightly_played",
     "moderately_played",
-    "heavily_damaged",
+    "heavily_played",
     "damaged",
     "unknown",
 ]
@@ -30,7 +30,7 @@ class CollectionItemCreate(BaseModel):
     # This field stores the price of one card, not the total lot price
     purchase_price_per_card: Decimal | None = Field(
         default = None, 
-        gt = 0,
+        ge=0,
         max_digits = 10,
         decimal_places = 2,
     )
