@@ -1,19 +1,20 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-05
+Last updated: 2026-08-07
 Last environment: Windows desktop
 Branch: `main`
 Roadmap position: The Portfolio Data Model is underway. The initial
 `CatalogCard`, `CardVariant`, and `CollectionItem` models and migrations are
-complete. Focus now moves to verifying `CollectionItem` rejection rules before
-designing price history.
+complete, and the first real `CollectionItem` API slice is underway. Its
+Pydantic schemas and POST router are written; the router still needs to be
+connected to the FastAPI application and tested through HTTP.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Seventeen test functions covering eighteen cases with an isolated in-memory
+- Eighteen test functions covering nineteen cases with an isolated in-memory
   database
 - Alembic `1.18.5` is the only application-schema manager
 - Five migrations: initial `cards`, required card names, `catalog_cards`,
@@ -23,31 +24,31 @@ designing price history.
   owned `CollectionItem` rows
 - SQLite foreign-key enforcement is enabled for development and test
   connections
+- `CollectionItemCreate` and `CollectionItemResponse` define the initial API
+  input and output contract
+- A `POST /collection-items` route is implemented but is not yet included in
+  `main.py`
 - Existing `Card`, `CatalogCard`, and `CardVariant` data were preserved while
   `collection_items` was added
 - Local SQLite files are excluded from Git
 
 ## Completed This Session
 
-- Enabled SQLite foreign-key enforcement through the SQLAlchemy connection hook
-- Added a database test proving a `CardVariant` cannot reference a nonexistent
-  `CatalogCard`
-- Defined `CollectionItem` as an owned lot sharing a variant, condition,
-  quantity, and purchase information
-- Added the initial `CollectionItem` model with price, currency, date, and notes
-  fields
-- Added allowed-condition, positive-quantity, and nonnegative-price database
-  constraints
-- Added the indexed `card_variant_id` foreign key and bidirectional
-  `CardVariant.collection_items` relationship
-- Registered `CollectionItem` with Alembic, then generated, reviewed, and
-  applied revision `b947a39991a6`
-- Added a successful database test covering relationship cascading, generated
-  IDs, and the default quantity and currency
+- Added a database test proving an unsupported collection-item condition is
+  rejected
+- Added `CollectionItemCreate` with validation for condition, quantity,
+  per-card purchase price, currency, purchase date, and notes
+- Used `Decimal` for API purchase prices and exposed the six canonical condition
+  values through the Pydantic schema
+- Added `CollectionItemResponse` with ORM attribute serialization
+- Added the initial `POST /collection-items` route
+- Added a friendly 404 check when the requested `CardVariant` does not exist
+- Added model conversion, commit, refresh, and 201 response behavior to the
+  create route
 
 ## Verification
 
-- `python -m pytest`: 18 passed
+- `python -m pytest`: 19 passed before the new router was added
 - `alembic current`: `b947a39991a6 (head)`
 - `alembic check`: no new upgrade operations detected
 - Development and test connections report `PRAGMA foreign_keys = 1`
@@ -56,6 +57,10 @@ designing price history.
   constraints, its foreign key, primary key, and lookup index
 - The collection-item migration does not alter or delete existing tables or
   data
+- Pydantic schema check confirmed the default quantity and currency, zero-dollar
+  purchases, and the canonical condition choices
+- The new router imports successfully and registers `/collection-items`; it is
+  not yet covered by an HTTP test
 
 ## V1 Decisions
 
@@ -81,10 +86,12 @@ designing price history.
 - `PriceSnapshot` and `User` are not implemented
 - Reference pricing currently lives on `CatalogCard`; lasting variant-specific
   pricing and price history still need to be modeled
-- `CatalogCard`, `CardVariant`, and `CollectionItem` do not yet have Pydantic
-  schemas, routes, or an import service
-- `CollectionItem` constraint rejection cases are not yet covered by focused
-  tests
+- `CatalogCard` and `CardVariant` do not yet have Pydantic schemas, routes, or an
+  import service
+- The `CollectionItem` router is not connected to `main.py` and does not yet
+  provide list, detail, update, or delete operations
+- Nonpositive quantity, negative purchase price, and missing-variant rejection
+  cases are not yet covered by focused `CollectionItem` tests
 - The condition dropdown will be implemented with the frontend; the database
   currently enforces its canonical values
 - Card-list ordering is not deterministic
@@ -94,10 +101,14 @@ designing price history.
 
 ## Exact Next Action
 
-Add focused database tests for the `CollectionItem` constraints, starting with
-an invalid condition and then covering nonpositive quantity, negative purchase
-price, and a nonexistent `CardVariant`. After those rules are verified, agree on
-the responsibility and minimal fields for `PriceSnapshot`.
+Import the collection-items router in `main.py`, include it in the FastAPI
+application, and add one HTTP test proving a valid request returns 201 and a
+saved `CollectionItem`. Then add `GET /collection-items` so the frontend will
+have both create and list operations.
+
+Keep tests attached to each backend feature. Batch the remaining database
+constraint cases instead of treating each one as a separate development
+session.
 
 Preserve the temporary `Card` table and current reference-price fields until
 there is an explicit data-migration plan.
