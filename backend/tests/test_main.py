@@ -523,3 +523,61 @@ def test_create_collection_item_endpoint():
     assert data["quantity"] == 1
     assert data["purchase_currency"] == "USD"
 
+
+def test_get_collection_items_respects_limit_and_id_order():
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(variant)
+        db.commit()
+        db.refresh(variant)
+
+        variant_id = variant.id
+
+    # Create two owned items through the real POST endpoint.
+    first_response = client.post(
+        "/collection-items",
+        json={
+            "card_variant_id": variant_id,
+            "condition": "near_mint",
+        },
+    )
+
+    second_response = client.post(
+        "/collection-items",
+        json={
+            "card_variant_id": variant_id,
+            "condition": "damaged",
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+
+    # Query parameters are supplied separately from a GET request body.
+    response = client.get(
+        "/collection-items",
+        params={"limit": 1},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+
+    # ID ordering means the first created item should be returned first.
+    assert data[0]["id"] == first_response.json()["id"]
+    assert data[0]["condition"] == "near_mint"

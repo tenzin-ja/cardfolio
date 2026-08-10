@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -20,7 +20,6 @@ router = APIRouter(
     response_model = CollectionItemResponse,
     status_code = status.HTTP_201_CREATED
 )
-
 def create_collection_item(
     item:CollectionItemCreate, 
     db: Session = Depends(get_db),
@@ -51,3 +50,25 @@ def create_collection_item(
     db.refresh(db_item)
 
     return db_item
+
+@router.get(
+    "",
+    response_model = list[CollectionItemResponse],
+)
+def get_collection_items(
+    #Prevent clients from requesting an unlimited number of records at once.
+    limit: int = Query(default = 20, ge = 1, le = 100),
+    db: Session = Depends(get_db)
+):
+    """
+    Return saved collection items in a stable order.
+    """
+
+    #SQLite does not gaurantee row order unless order_by() is included
+    #Ordering by ID gives clients predictable results between requests
+    return(
+        db.query(CollectionItem)
+        .order_by(CollectionItem.id)
+        .limit(limit)
+        .all()
+    )
