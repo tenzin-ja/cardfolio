@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel,ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 #Restricts API input to the same condtion values permitted by the database
 CardCondition = Literal [
@@ -48,10 +48,57 @@ class CollectionItemCreate(BaseModel):
 
     notes: str | None = None
 
+
+class CollectionItemUpdate(BaseModel):
+    """
+    Defines fields that may be changed through a PATCH request.
+
+    Every field may be omitted because PATCH changes only the fields supplied
+    by the client.
+    """
+
+    card_variant_id: int | None = Field(default=None, gt=0)
+    condition: CardCondition | None = None
+    quantity: int | None = Field(default=None, gt=0)
+
+    # These fields may explicitly be set to null to clear saved purchase data.
+    purchase_price_per_card: Decimal | None = Field(
+        default=None,
+        ge=0,
+        max_digits=10,
+        decimal_places=2,
+    )
+    purchase_currency: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=3,
+    )
+    purchase_date: date | None = None
+    notes: str | None = None
+
+    @field_validator(
+        "card_variant_id",
+        "condition",
+        "quantity",
+        "purchase_currency",
+    )
+    @classmethod
+    def reject_null_required_fields(cls, value):
+        """
+        These fields may be omitted, but explicitly setting them to null would
+        violate the non-null database columns.
+        """
+        if value is None:
+            raise ValueError("Field cannot be null")
+
+        return value
+
+
 #The response contains every creation field plus the database generated ID
 class CollectionItemResponse(CollectionItemCreate):
     id: int
 
-    # Allos the Pydantic to build this reponse by reading attributes from a 
+    # Allows the Pydantic to build this reponse by reading attributes from a 
     #SQLAlchemy CollectionItem object instead of requiring a dict
     model_config = ConfigDict(from_attributes = True)
+
