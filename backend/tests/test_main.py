@@ -481,7 +481,7 @@ def test_collection_item_rejects_invalid_condition():
         db.rollback()
 
 
-def test_create_colletion_item_endpoit():
+def test_create_collection_item_endpoint():
     catalog_card = CatalogCard(
         provider="pokemon_tcg",
         provider_card_id="base1-4",
@@ -499,12 +499,12 @@ def test_create_colletion_item_endpoit():
         #adding the variant also saves its connected Catalogcard
         db.add(variant)
         db.commit()
-        db.refresh(variant)
-
-    #save teh plain integer before teh session closes. SQLAlehcmy objects 
-    # may otherwise need their closed session to reload expired values
-    variant_id = variant.id
-
+        db.refresh(variant)  
+        #save the plain integer before the session closes. SQLAlehcmy objects 
+        # may otherwise need their closed session to reload expired values
+        variant_id = variant.id
+    
+        
     response = client.post(
         "/collection-items",
         json = {
