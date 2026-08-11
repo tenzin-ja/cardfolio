@@ -1,19 +1,21 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 Last environment: Windows desktop
 Branch: `main`
 Roadmap position: The Portfolio Data Model is underway. The initial
 `CatalogCard`, `CardVariant`, and `CollectionItem` models and migrations are
-complete. The real `CollectionItem` API now supports tested create and list
-operations, and its partial-update schema is ready for the PATCH route.
+complete. The real `CollectionItem` API now supports tested create, list,
+update, and delete operations. External catalog integration has begun with
+normalized search schemas and a pure Pokemon TCG response-mapping service.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Twenty test functions covering twenty-one cases with an isolated in-memory
+- Twenty-two test functions covering twenty-three cases with an isolated
+  in-memory
   database
 - Alembic `1.18.5` is the only application-schema manager
 - Five migrations: initial `cards`, required card names, `catalog_cards`,
@@ -25,27 +27,29 @@ operations, and its partial-update schema is ready for the PATCH route.
   connections
 - `CollectionItemCreate`, `CollectionItemUpdate`, and `CollectionItemResponse`
   define the current API contract
-- `POST /collection-items` and `GET /collection-items` are connected to the
-  FastAPI application
+- `POST`, `GET`, `PATCH`, and `DELETE` collection-item operations are connected
+  to the FastAPI application
+- Catalog-search schemas and Pokemon TCG mapping functions normalize external
+  identity, image, pagination, variant, and market-price data
 - Existing `Card`, `CatalogCard`, and `CardVariant` data were preserved while
   `collection_items` was added
 - Local SQLite files are excluded from Git
 
 ## Completed This Session
 
-- Connected the collection-items router to `main.py`
-- Added an HTTP integration test proving a valid collection item can be created
-  with a 201 response and database defaults
-- Added `GET /collection-items` with a bounded limit and deterministic ID order
-- Added an HTTP integration test covering collection listing, limiting, and
-  ordering
-- Added `CollectionItemUpdate` for partial updates
-- Distinguished omitted PATCH fields from explicit null values, allowing
-  optional purchase data to be cleared while protecting required columns
+- Added `PATCH /collection-items/{item_id}` with partial-field application,
+  missing-item handling, and replacement-variant validation
+- Added an HTTP integration test proving PATCH changes only supplied fields
+- Added `DELETE /collection-items/{item_id}` with an empty 204 response
+- Added an HTTP integration test proving deletion removes the owned item while
+  preserving its shared variant
+- Added normalized catalog card, variant-price, and paginated search schemas
+- Added a dedicated Pokemon TCG service module with pure functions for card,
+  price, variant-key, and search-response mapping
 
 ## Verification
 
-- `python -m pytest`: 21 passed
+- `python -m pytest`: 23 passed
 - `alembic current`: `b947a39991a6 (head)`
 - `alembic check`: no new upgrade operations detected
 - Development and test connections report `PRAGMA foreign_keys = 1`
@@ -54,9 +58,12 @@ operations, and its partial-update schema is ready for the PATCH route.
   constraints, its foreign key, primary key, and lookup index
 - The collection-item migration does not alter or delete existing tables or
   data
-- FastAPI's generated API schema exposes GET and POST on `/collection-items`
+- FastAPI's generated API schema exposes create, list, update, and delete
+  collection-item operations
 - Pydantic update-schema checks confirmed omitted fields remain untouched,
   optional purchase prices can be cleared, and required fields reject null
+- Representative mapping check converted `base1-4`, nested set and image data,
+  pagination, Decimal prices, and `reverseHolofoil` to `reverse_holofoil`
 
 ## V1 Decisions
 
@@ -82,10 +89,13 @@ operations, and its partial-update schema is ready for the PATCH route.
 - `PriceSnapshot` and `User` are not implemented
 - Reference pricing currently lives on `CatalogCard`; lasting variant-specific
   pricing and price history still need to be modeled
-- `CatalogCard` and `CardVariant` do not yet have Pydantic schemas, routes, or an
-  import service
-- The `CollectionItem` router does not yet provide detail, update, or delete
-  operations; its update schema is ready
+- The Pokemon TCG service does not yet make HTTP requests, read an API key, or
+  handle timeouts, rate limits, and provider errors
+- Catalog search and import routes are not implemented, and selected results are
+  not yet persisted as `CatalogCard` and `CardVariant` rows
+- A single-item collection GET operation is not yet implemented
+- The pure Pokemon response mapper has a manual verification check but not yet
+  an automated unit test
 - Nonpositive quantity, negative purchase price, and missing-variant rejection
   cases are not yet covered by focused `CollectionItem` tests
 - The condition dropdown will be implemented with the frontend; the database
@@ -97,13 +107,11 @@ operations, and its partial-update schema is ready for the PATCH route.
 
 ## Exact Next Action
 
-Import `CollectionItemUpdate` into the collection-items router and implement
-`PATCH /collection-items/{item_id}`. It should return 404 for a missing item,
-validate a replacement variant when supplied, apply only fields present in the
-request, and return the refreshed item.
-
-Add one focused HTTP test for a successful partial update, then proceed to the
-delete operation.
+Add one focused unit test for the pure Pokemon response mapper, then implement
+the service's real `httpx` search request with an environment-supplied API key,
+an explicit timeout, and provider-error translation. Follow it with
+`GET /catalog/search` so the frontend can search without contacting the provider
+directly.
 
 Keep tests attached to each backend feature. Batch the remaining database
 constraint cases instead of treating each one as a separate development
