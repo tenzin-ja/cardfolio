@@ -153,10 +153,9 @@ def delete_collection_item(
 
     if db_item is None:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND
-            detail = "Collection item not found"
-        )
-
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection item not found",
+        )   
     #This removes only the owned CollectionItem. Its shared CaardVariant and 
     # CatalogCard remain avaliable 
     db.delete(db_item)

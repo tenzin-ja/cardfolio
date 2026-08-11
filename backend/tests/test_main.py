@@ -639,3 +639,50 @@ def test_update_collection_item_changes_only_supplied_fields():
     # These fields were omitted from PATCH, so they should remain unchanged.
     assert data["condition"] == "near_mint"
     assert data["card_variant_id"] == variant_id
+
+def test_delete_collection_item_removes_item_but_preserves_variant():
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(variant)
+        db.commit()
+        db.refresh(variant)
+
+        variant_id = variant.id
+
+    # Create the owned item that will be deleted.
+    create_response = client.post(
+        "/collection-items",
+        json={
+            "card_variant_id": variant_id,
+            "condition": "near_mint",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    item_id = create_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/collection-items/{item_id}"
+    )
+
+    assert delete_response.status_code == 204
+
+    # A 204 response should contain no response body.
+    assert delete_response.content == b""
+
+    with TestingSessionLocal() as db:
+        # The owned
