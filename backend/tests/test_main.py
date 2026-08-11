@@ -685,4 +685,8 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
     assert delete_response.content == b""
 
     with TestingSessionLocal() as db:
-        # The owned
+        # The owned item should be gone.
+        assert db.get(CollectionItem, item_id) is None
+
+        # The shared variant must remain for other collection items.
+        assert db.get(CardVariant, variant_id) is not None
