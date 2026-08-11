@@ -581,3 +581,61 @@ def test_get_collection_items_respects_limit_and_id_order():
     # ID ordering means the first created item should be returned first.
     assert data[0]["id"] == first_response.json()["id"]
     assert data[0]["condition"] == "near_mint"
+
+
+def test_update_collection_item_changes_only_supplied_fields():
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+
+    with TestingSessionLocal() as db:
+        # Saving the variant also saves its connected CatalogCard.
+        db.add(variant)
+        db.commit()
+        db.refresh(variant)
+
+        # Store the integer before the database session closes.
+        variant_id = variant.id
+
+    # Create the collection item that will be updated.
+    create_response = client.post(
+        "/collection-items",
+        json={
+            "card_variant_id": variant_id,
+            "condition": "near_mint",
+            "quantity": 1,
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    item_id = create_response.json()["id"]
+
+    # Send only quantity because PATCH should leave omitted fields unchanged.
+    response = client.patch(
+        f"/collection-items/{item_id}",
+        json={
+            "quantity": 3,
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == item_id
+    assert data["quantity"] == 3
+
+    # These fields were omitted from PATCH, so they should remain unchanged.
+    assert data["condition"] == "near_mint"
+    assert data["card_variant_id"] == variant_id

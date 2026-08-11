@@ -1,4 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from sqlalchemy.orm import Session
 
 
@@ -76,9 +83,10 @@ def get_collection_items(
         .all()
     )
 
+
 @router.patch(
-    "",
-    response_model = CollectionItemResponse,
+    "/{item_id}",
+    response_model=CollectionItemResponse,
 )
 def update_collection_item(
     item_id: int,
@@ -86,18 +94,73 @@ def update_collection_item(
     db: Session = Depends(get_db),
 ):
     """
-    Update only the collection item fields supplied by the client.
+    Update only the collection-item fields supplied by the client.
     """
 
-    #Retrieve the existing database row before attempting any changes
-    db_item = db.get(CollectionItem,item_id)
+    # Retrieve the existing database row before attempting any changes.
+    db_item = db.get(CollectionItem, item_id)
 
     if db_item is None:
         raise HTTPException(
-            statu_code = status.HTTP_404_NOT_FOUND,
-            detail = "Collection item not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection item not found",
         )
 
-    # exclude_unset = True distinguishes omitted fields from fields that the 
-    # client deliberately supplied, including optional fields set to null
-    update_data = item.mode_dump(exclude_unset = True)
+    # exclude_unset=True distinguishes omitted fields from fields that the
+    # client deliberately supplied, including optional fields set to null.
+    update_data = item.model_dump(exclude_unset=True)
+
+    # If the client changes the variant, verify the replacement exists before
+    # updating the foreign key.
+    if "card_variant_id" in update_data:
+        card_variant = db.get(
+            CardVariant,
+            update_data["card_variant_id"],
+        )
+
+    if db_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection item not found",
+        )
+
+    # setattr() dynamically performs assignments such as:
+    # db_item.quantity = 2
+    # db_item.condition = "damaged"
+    for field, value in update_data.items():
+        setattr(db_item, field, value)
+
+    db.commit()
+    db.refresh(db_item)
+
+    return db_item
+
+
+@router.delete(
+    "/{item_id}",
+    status_code = status.HTTP_204_NO_CONTENT
+)
+def delete_collection_item(
+    item_id:int,
+    db: Session = Depends(get_db)
+):
+
+    """
+    Delete one owned collection item
+    """
+
+    db_item = db.get(CollectionItem, item_id)
+
+    if db_item is None:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND
+            detail = "Collection item not found"
+        )
+
+    #This removes only the owned CollectionItem. Its shared CaardVariant and 
+    # CatalogCard remain avaliable 
+    db.delete(db_item)
+    db.commit()
+
+    # A successful 204 response intentionally conatains no JSON body
+    return Response(status_code = status.HTTP_204_NO_CONTENT)
