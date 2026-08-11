@@ -9,6 +9,7 @@ from app.models.collection_item import CollectionItem
 from app.schemas.collection_item import(
     CollectionItemCreate,
     CollectionItemResponse,
+    CollectionItemUpdate,
 )
 
 # The prefix is automatically added to every route defined in this file.
@@ -23,7 +24,7 @@ router = APIRouter(
     status_code = status.HTTP_201_CREATED
 )
 def create_collection_item(
-    item:CollectionItemCreate, 
+    item: CollectionItemCreate, 
     db: Session = Depends(get_db),
 ):
     """
@@ -74,3 +75,29 @@ def get_collection_items(
         .limit(limit)
         .all()
     )
+
+@router.patch(
+    "",
+    response_model = CollectionItemResponse,
+)
+def update_collection_item(
+    item_id: int,
+    item: CollectionItemUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    Update only the collection item fields supplied by the client.
+    """
+
+    #Retrieve the existing database row before attempting any changes
+    db_item = db.get(CollectionItem,item_id)
+
+    if db_item is None:
+        raise HTTPException(
+            statu_code = status.HTTP_404_NOT_FOUND,
+            detail = "Collection item not found",
+        )
+
+    # exclude_unset = True distinguishes omitted fields from fields that the 
+    # client deliberately supplied, including optional fields set to null
+    update_data = item.mode_dump(exclude_unset = True)
