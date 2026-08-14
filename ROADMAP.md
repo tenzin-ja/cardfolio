@@ -62,6 +62,24 @@ Key outcomes:
 - Navigate paginated card results.
 - Show a basic portfolio summary.
 
+## 6. AI/MCP Integration
+
+Add an optional Model Context Protocol (MCP) layer after Cardfolio's core API
+and dashboard workflows are stable. Keep FastAPI as the canonical application
+API and expose focused AI tools through a thin MCP adapter.
+
+Key outcomes:
+
+- Expose read-only tools for catalog search, collection listing, and portfolio
+  summaries.
+- Connect and test the MCP server locally with Codex.
+- Reuse Cardfolio's existing service and API boundaries rather than duplicating
+  business logic in the MCP layer.
+- Defer collection-changing tools until user authentication, authorization,
+  and explicit confirmation safeguards are available.
+- Prepare the MCP integration for a remotely hosted endpoint after production
+  deployment.
+
 ## Later Work
 
 - User accounts and collection ownership
