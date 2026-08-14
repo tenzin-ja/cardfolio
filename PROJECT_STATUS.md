@@ -1,22 +1,20 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-11
+Last updated: 2026-08-14
 Last environment: Windows desktop
 Branch: `main`
-Roadmap position: The Portfolio Data Model is underway. The initial
-`CatalogCard`, `CardVariant`, and `CollectionItem` models and migrations are
-complete. The real `CollectionItem` API now supports tested create, list,
-update, and delete operations. External catalog integration has begun with
-normalized search schemas and a pure Pokemon TCG response-mapping service.
+Roadmap position: The External Card Catalog milestone is underway. The initial
+portfolio models and the `CollectionItem` CRUD API are complete. Catalog-search
+schemas, the pure Pokemon TCG response mapper, and its first focused unit test
+are now in place.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Twenty-two test functions covering twenty-three cases with an isolated
-  in-memory
-  database
+- Twenty-three test functions covering twenty-four cases; database tests use an
+  isolated in-memory database
 - Alembic `1.18.5` is the only application-schema manager
 - Five migrations: initial `cards`, required card names, `catalog_cards`,
   `card_variants`, and `collection_items`
@@ -37,19 +35,14 @@ normalized search schemas and a pure Pokemon TCG response-mapping service.
 
 ## Completed This Session
 
-- Added `PATCH /collection-items/{item_id}` with partial-field application,
-  missing-item handling, and replacement-variant validation
-- Added an HTTP integration test proving PATCH changes only supplied fields
-- Added `DELETE /collection-items/{item_id}` with an empty 204 response
-- Added an HTTP integration test proving deletion removes the owned item while
-  preserving its shared variant
-- Added normalized catalog card, variant-price, and paginated search schemas
-- Added a dedicated Pokemon TCG service module with pure functions for card,
-  price, variant-key, and search-response mapping
+- Added a focused unit test for the pure Pokemon TCG search-response mapper
+- Verified pagination, nested card fields, stable variant ordering,
+  `reverseHolofoil` normalization, and Decimal market-price conversion
 
 ## Verification
 
-- `python -m pytest`: 23 passed
+- `python -m pytest`: 24 passed with one unrelated Starlette/httpx deprecation
+  warning
 - `alembic current`: `b947a39991a6 (head)`
 - `alembic check`: no new upgrade operations detected
 - Development and test connections report `PRAGMA foreign_keys = 1`
@@ -94,8 +87,6 @@ normalized search schemas and a pure Pokemon TCG response-mapping service.
 - Catalog search and import routes are not implemented, and selected results are
   not yet persisted as `CatalogCard` and `CardVariant` rows
 - A single-item collection GET operation is not yet implemented
-- The pure Pokemon response mapper has a manual verification check but not yet
-  an automated unit test
 - Nonpositive quantity, negative purchase price, and missing-variant rejection
   cases are not yet covered by focused `CollectionItem` tests
 - The condition dropdown will be implemented with the frontend; the database
@@ -107,11 +98,10 @@ normalized search schemas and a pure Pokemon TCG response-mapping service.
 
 ## Exact Next Action
 
-Add one focused unit test for the pure Pokemon response mapper, then implement
-the service's real `httpx` search request with an environment-supplied API key,
-an explicit timeout, and provider-error translation. Follow it with
-`GET /catalog/search` so the frontend can search without contacting the provider
-directly.
+Implement the Pokemon TCG service's real `httpx` search request with an
+environment-supplied API key, an explicit timeout, and provider-error
+translation. Follow it with `GET /catalog/search` so the frontend can search
+without contacting the provider directly.
 
 Keep tests attached to each backend feature. Batch the remaining database
 constraint cases instead of treating each one as a separate development
