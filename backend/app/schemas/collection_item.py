@@ -56,8 +56,8 @@ class CollectionItemUpdate(BaseModel):
     Every field may be omitted because PATCH changes only the fields supplied
     by the client.
     """
+    model_config = ConfigDict(extra="forbid")
 
-    card_variant_id: int | None = Field(default=None, gt=0)
     condition: CardCondition | None = None
     quantity: int | None = Field(default=None, gt=0)
 
@@ -77,7 +77,6 @@ class CollectionItemUpdate(BaseModel):
     notes: str | None = None
 
     @field_validator(
-        "card_variant_id",
         "condition",
         "quantity",
         "purchase_currency",
