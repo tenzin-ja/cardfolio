@@ -110,25 +110,6 @@ def update_collection_item(
     # client deliberately supplied, including optional fields set to null.
     update_data = item.model_dump(exclude_unset=True)
 
-    # If the client changes the variant, verify the replacement exists before
-    # and belongs to the same catalog card.
-    if "card_variant_id" in update_data:
-        replacement_variant = db.get(
-            CardVariant,
-            update_data["card_variant_id"],
-        )
-        if replacement_variant is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Card variant not found",
-            )
-        current_catalog_card_id = db_item.card_variant.catalog_card_id
-
-        if replacement_variant.catalog_card_id != current_catalog_card_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="Replacement variant must belong to the same catalog card",
-            )
 
     # setattr() dynamically performs assignments such as:
     # db_item.quantity = 2
