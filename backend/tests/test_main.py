@@ -726,3 +726,81 @@ def test_price_snapshot_can_be_saved():
         assert snapshot.source == "tcgplayer"
         assert snapshot.observed_at is not None
         assert snapshot in variant.price_snapshots    
+
+def test_price_snapshot_rejects_negative_market_price():
+    """Reject negative historical prices at the database boundary."""
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+
+    snapshot = PriceSnapshot(
+        card_variant=variant,
+        market_price=Decimal("-0.01"),
+        source="tcgplayer",
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(snapshot)
+
+        # The database constraint should reject this even without API validation.
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+        db.rollback()
+
+
+def test_deleting_card_variant_removes_price_snapshots():
+    """Delete a variant's price history while preserving its catalog card."""
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+
+    snapshot = PriceSnapshot(
+        card_variant=variant,
+        market_price=Decimal("25.50"),
+        source="tcgplayer",
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(snapshot)
+        db.commit()
+
+        catalog_card_id = catalog_card.id
+        variant_id = variant.id
+        snapshot_id = snapshot.id
+
+    # Use a fresh session so the database handles the ON DELETE CASCADE.
+    with TestingSessionLocal() as db:
+        variant_to_delete = db.get(CardVariant, variant_id)
+
+        assert variant_to_delete is not None
+
+        db.delete(variant_to_delete)
+        db.commit()
+
+    with TestingSessionLocal() as db:
+        assert db.get(CardVariant, variant_id) is None
+        assert db.get(PriceSnapshot, snapshot_id) is None
+
+        # Deleting one finish must not remove its shared catalog card.
+        assert db.get(CatalogCard, catalog_card_id) is not None
