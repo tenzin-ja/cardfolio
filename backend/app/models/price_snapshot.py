@@ -44,7 +44,7 @@ class PriceSnapshot(Base):
 
     id = Column(Integer, primary_key = True)
 
-    #Every obseration belongs to one specific finish, such as holofoil. 
+    # Every obseration belongs to one specific finish, such as holofoil. 
     # If that shared variant is deleted, its now unusable history is deleted too.
 
     card_variant_id = Column(
@@ -70,4 +70,7 @@ class PriceSnapshot(Base):
 
     #Allows snapshot.card_variant to retrieve the associated CardVariant. 
     # We will add the reverse CardVariant.price_snapshots link next.
-    card_variant = relationship("CardVariant")
+    card_variant = relationship(
+    "CardVariant",
+    back_populates="price_snapshots",
+    )

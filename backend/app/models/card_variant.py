@@ -40,4 +40,10 @@ class CardVariant(Base):
     back_populates="card_variant",
     )
 
+    price_snapshots = relationship(
+        "PriceSnapshot",
+        back_populates = "card_variant",
+        cascade = "all, delete-orphan",
+        passive_deletes = True
+    )
     
