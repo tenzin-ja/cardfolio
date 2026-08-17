@@ -25,8 +25,8 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('market_price', sa.Numeric(precision=10, scale=2), nullable=True))
         batch_op.add_column(sa.Column('market_price_source', sa.String(length=50), nullable=True))
         batch_op.add_column(sa.Column('market_price_updated_at', sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(sa.Column('currency', sa.String(length=3), nullable=False))
-
+        batch_op.add_column(sa.Column('currency', sa.String(length=3), nullable=False), server_default = sa.text("'USD'"))
+        
     # ### end Alembic commands ###
 
 

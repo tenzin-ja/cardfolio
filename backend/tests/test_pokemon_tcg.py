@@ -56,14 +56,14 @@ def test_map_pokemon_search_response_normalizes_provider_data():
     assert card.rarity == "Rare Holo"
     assert card.image_url == "https://images.example/charizard.png"
 
-    # The mapper sorts variants and converts provider camelCase names into
+    # mapper sorts variants and converts provider camelCase names into
     # Cardfolio's snake_case format.
     assert [variant.variant_key for variant in card.variants] == [
         "normal",
         "reverse_holofoil",
     ]
 
-    # Decimal verifies that monetary values were not left as Python floats.
+    # Decimal verifies that money values weren't left as python floats.
     assert [variant.market_price for variant in card.variants] == [
         Decimal("10.0"),
         Decimal("123.45"),

@@ -1,3 +1,7 @@
+
+from sqlalchemy.orm import relationship
+
+from app.db.database import Base
 #This imports Python’s timestamp tools, used to create a value
 from datetime import datetime, timezone
 #Datetime here imports SQLAlchemy’s database column type
@@ -41,7 +45,7 @@ class PriceSnapshot(Base):
     id = Column(Integer, primary_key = True)
 
     #Every obseration belongs to one specific finish, such as holofoil. 
-    # If that shared variant is deleted, its unusable history is deleted too.
+    # If that shared variant is deleted, its now unusable history is deleted too.
 
     card_variant_id = Column(
         Integer, 
