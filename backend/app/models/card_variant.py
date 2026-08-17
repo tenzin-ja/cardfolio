@@ -39,3 +39,5 @@ class CardVariant(Base):
     "CollectionItem",
     back_populates="card_variant",
     )
+
+    
