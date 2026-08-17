@@ -1,56 +1,67 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-14
+Last updated: 2026-08-17
 Last environment: Windows desktop
 Branch: `main`
-Roadmap position: The External Card Catalog milestone is underway. The initial
-portfolio models and the `CollectionItem` CRUD API are complete. Catalog-search
-schemas, the pure Pokemon TCG response mapper, and its first focused unit test
-are now in place.
+Roadmap position: The External Card Catalog milestone is underway. The portfolio
+data model now includes catalog cards, immutable variants, owned collection
+items, current variant pricing, and historical price snapshots. Catalog-search
+schemas and the pure Pokemon TCG response mapper are in place; provider HTTP
+search and import persistence remain.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Twenty-three test functions covering twenty-four cases; database tests use an
+- Twenty-six test functions covering twenty-seven cases; database tests use an
   isolated in-memory database
 - Alembic `1.18.5` is the only application-schema manager
-- Five migrations: initial `cards`, required card names, `catalog_cards`,
-  `card_variants`, and `collection_items`
-- Development database is at revision `b947a39991a6 (head)`
+- Seven migrations: initial `cards`, required card names, `catalog_cards`,
+  `card_variants`, `collection_items`, variant pricing, and `price_snapshots`
+- Development database is at revision `959d95fa90be (head)`
+- Application startup registers `Card`, `CatalogCard`, `CardVariant`,
+  `CollectionItem`, and `PriceSnapshot` with SQLAlchemy
 - `CatalogCard` has many `CardVariant` rows, and each `CardVariant` can have many
-  owned `CollectionItem` rows
+  owned `CollectionItem` and historical `PriceSnapshot` rows
+- `CardVariant` stores the latest market price, source, update time, and currency
+- `PriceSnapshot` stores exact historical prices with a nonnegative-price
+  constraint, cascading variant foreign key, and chart-query index
 - SQLite foreign-key enforcement is enabled for development and test
   connections
 - `CollectionItemCreate`, `CollectionItemUpdate`, and `CollectionItemResponse`
   define the current API contract
-- `POST`, `GET`, `PATCH`, and `DELETE` collection-item operations are connected
-  to the FastAPI application
+- Collection-item create, list, partial-update, and delete operations are
+  connected to FastAPI; the selected variant is immutable after creation
 - Catalog-search schemas and Pokemon TCG mapping functions normalize external
   identity, image, pagination, variant, and market-price data
-- Existing `Card`, `CatalogCard`, and `CardVariant` data were preserved while
-  `collection_items` was added
+- The variant-pricing migration supplies a database-level `USD` default so
+  existing variants can receive the new required currency value
 - Local SQLite files are excluded from Git
 
 ## Completed This Session
 
-- Added a focused unit test for the pure Pokemon TCG search-response mapper
-- Verified pagination, nested card fields, stable variant ordering,
-  `reverseHolofoil` normalization, and Decimal market-price conversion
+- Fixed SQLAlchemy model registration during normal application startup
+- Made a collection item's selected `CardVariant` immutable after creation
+- Added current market-price fields to `CardVariant` and a safe currency default
+- Added the `PriceSnapshot` model, migration, bidirectional relationship,
+  nonnegative-price constraint, cascading delete behavior, and composite index
+- Added focused tests for snapshot persistence and defaults, negative-price
+  rejection, and deletion with preservation of the shared `CatalogCard`
 
 ## Verification
 
-- `python -m pytest`: 24 passed with one unrelated Starlette/httpx deprecation
+- `python -m pytest`: 27 passed with one unrelated Starlette/httpx deprecation
   warning
-- `alembic current`: `b947a39991a6 (head)`
+- `alembic current`: `959d95fa90be (head)`
 - `alembic check`: no new upgrade operations detected
 - Development and test connections report `PRAGMA foreign_keys = 1`
-- The `CardVariant`/`CollectionItem` bidirectional mapper check passed
-- The collection-item migration contains all eight columns, three check
-  constraints, its foreign key, primary key, and lookup index
-- The collection-item migration does not alter or delete existing tables or
-  data
+- Clean SQLAlchemy mapper configuration succeeds during normal app loading
+- The `CardVariant`/`PriceSnapshot` bidirectional relationship check passed
+- Snapshot checks confirmed `USD` and observation-time defaults, exact Decimal
+  prices, negative-price rejection, and cascading history deletion
+- Deleting a variant removes its price snapshots while preserving its shared
+  `CatalogCard`
 - FastAPI's generated API schema exposes create, list, update, and delete
   collection-item operations
 - Pydantic update-schema checks confirmed omitted fields remain untouched,
@@ -66,10 +77,12 @@ are now in place.
   when multiple cards share the same name
 - Use `CardVariant` for a printing's finish or version, not an owned copy's
   condition
+- Keep an owned collection item's selected variant immutable after creation
 - Import catalog cards on demand from the Pokemon TCG API
 - Use TCGplayer-derived prices as reference values
-- Treat a catalog reference price as a shared raw Near Mint baseline
-- Store an owned card's condition without overwriting the shared catalog price
+- Treat each variant's current market price as a shared raw Near Mint baseline
+- Store historical provider observations as `PriceSnapshot` rows per variant
+- Store an owned card's condition without overwriting shared variant pricing
 - Do not invent automatic condition-based price adjustments
 - Show eBay active listings later as comparisons, not confirmed market value
 - Include registration and private collections before release, while postponing
@@ -79,16 +92,20 @@ are now in place.
 ## Active Issues
 
 - The temporary `Card` table still combines catalog identity and collection data
-- `PriceSnapshot` and `User` are not implemented
-- Reference pricing currently lives on `CatalogCard`; lasting variant-specific
-  pricing and price history still need to be modeled
+- `User` and collection ownership are not implemented
+- Legacy reference-price fields still live on `CatalogCard` alongside the new
+  variant-level pricing fields and need an explicit migration plan
 - The Pokemon TCG service does not yet make HTTP requests, read an API key, or
   handle timeouts, rate limits, and provider errors
 - Catalog search and import routes are not implemented, and selected results are
   not yet persisted as `CatalogCard` and `CardVariant` rows
+- Provider refreshes do not yet update current variant prices or create
+  `PriceSnapshot` history rows
 - A single-item collection GET operation is not yet implemented
 - Nonpositive quantity, negative purchase price, and missing-variant rejection
   cases are not yet covered by focused `CollectionItem` tests
+- Rejection of attempts to change a collection item's immutable variant is not
+  yet covered by a focused API test
 - The condition dropdown will be implemented with the frontend; the database
   currently enforces its canonical values
 - Card-list ordering is not deterministic
@@ -102,6 +119,10 @@ Implement the Pokemon TCG service's real `httpx` search request with an
 environment-supplied API key, an explicit timeout, and provider-error
 translation. Follow it with `GET /catalog/search` so the frontend can search
 without contacting the provider directly.
+
+When catalog import and refresh are added, update each `CardVariant`'s current
+price fields and append a `PriceSnapshot` without changing owned-card condition
+data.
 
 Keep tests attached to each backend feature. Batch the remaining database
 constraint cases instead of treating each one as a separate development
