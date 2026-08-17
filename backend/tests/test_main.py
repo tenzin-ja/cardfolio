@@ -707,10 +707,22 @@ def test_price_snapshot_can_be_saved():
         catalog_card=catalog_card,
         variant_key="holofoil",
     )
-# Leave currency and observed_at unset so this test also checks their defaults.
+    # Leave currency and observed_at unset so this test also checks their defaults.
 
     snapshot = PriceSnapshot(
         card_variant=variant,
         market_price=Decimal("25.50"),
         source="tcgplayer",
     )
+    with TestingSessionLocal() as db:
+        db.add(snapshot)
+        db.commit()
+        db.refresh(snapshot)
+
+        assert snapshot.id is not None
+        assert snapshot.card_variant_id == variant.id
+        assert snapshot.market_price == Decimal("25.50")
+        assert snapshot.currency == "USD"
+        assert snapshot.source == "tcgplayer"
+        assert snapshot.observed_at is not None
+        assert snapshot in variant.price_snapshots    
