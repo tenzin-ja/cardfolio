@@ -68,8 +68,7 @@ class PriceSnapshot(Base):
         default = lambda: datetime.now(timezone.utc),
     )
 
-    #Allows snapshot.card_variant to retrieve the associated CardVariant. 
-    # We will add the reverse CardVariant.price_snapshots link next.
+    #Allows snapshot.card_variant to get the associated CardVariant. 
     card_variant = relationship(
     "CardVariant",
     back_populates="price_snapshots",

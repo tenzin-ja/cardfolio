@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.exc import IntegrityError
+from decimal import Decimal
 
 #The application engine is created while app modules are imported, so this 
 #override must be set before impoting the database or FastApi application
@@ -15,7 +16,7 @@ from app.db.database import Base, get_db
 from app.models.catalog_card import CatalogCard
 from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
-
+from app.models.price_snapshot import PriceSnapshot
 from app.main import app
 
 #Create a temp in-memory database used only for tests.
@@ -690,3 +691,26 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
 
         # The shared variant must remain for other collection items.
         assert db.get(CardVariant, variant_id) is not None
+
+def test_price_snapshot_can_be_saved():
+    """Save a variant price observation and check what should be its auto defaults."""
+    catalog_card = CatalogCard(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+    )
+
+    variant = CardVariant(
+        catalog_card=catalog_card,
+        variant_key="holofoil",
+    )
+# Leave currency and observed_at unset so this test also checks their defaults.
+
+    snapshot = PriceSnapshot(
+        card_variant=variant,
+        market_price=Decimal("25.50"),
+        source="tcgplayer",
+    )
