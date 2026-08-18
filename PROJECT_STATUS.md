@@ -1,7 +1,7 @@
 # Cardfolio Project Status
 
 Last updated: 2026-08-17
-Last environment: Windows desktop
+Last environment: macOS desktop
 Branch: `main`
 Roadmap position: The External Card Catalog milestone is underway. The portfolio
 data model now includes catalog cards, immutable variants, owned collection
@@ -35,8 +35,10 @@ search and import persistence remain.
   connected to FastAPI; the selected variant is immutable after creation
 - Catalog-search schemas and Pokemon TCG mapping functions normalize external
   identity, image, pagination, variant, and market-price data
-- The variant-pricing migration supplies a database-level `USD` default so
-  existing variants can receive the new required currency value
+- The variant-pricing migration uses direct SQLite column additions/removals,
+  avoiding a table rebuild while preserving linked collection items
+- The pricing migration supplies a database-level `USD` default so existing
+  variants receive the new required currency value
 - Local SQLite files are excluded from Git
 
 ## Completed This Session
@@ -48,6 +50,10 @@ search and import persistence remain.
   nonnegative-price constraint, cascading delete behavior, and composite index
 - Added focused tests for snapshot persistence and defaults, negative-price
   rejection, and deletion with preservation of the shared `CatalogCard`
+- Corrected the variant-pricing migration to add and remove columns directly
+  instead of rebuilding the foreign-key-referenced `card_variants` table
+- Upgraded the development database through the corrected migration to
+  `959d95fa90be (head)`
 
 ## Verification
 
@@ -55,6 +61,10 @@ search and import persistence remain.
   warning
 - `alembic current`: `959d95fa90be (head)`
 - `alembic check`: no new upgrade operations detected
+- A populated `b947a39991a6 -> head -> b947a39991a6 -> head` migration test
+  preserved the catalog card, variant, and linked collection item
+- The corrected migration backfilled `USD`, left no Alembic temporary table,
+  and completed with no SQLite foreign-key violations
 - Development and test connections report `PRAGMA foreign_keys = 1`
 - Clean SQLAlchemy mapper configuration succeeds during normal app loading
 - The `CardVariant`/`PriceSnapshot` bidirectional relationship check passed
@@ -101,6 +111,11 @@ search and import persistence remain.
   not yet persisted as `CatalogCard` and `CardVariant` rows
 - Provider refreshes do not yet update current variant prices or create
   `PriceSnapshot` history rows
+- Any separately preserved database that already applied the pre-fix
+  `7f64a6890b0e` revision must be rebuilt or reconciled because Alembic does not
+  rerun an edited migration
+- SQLite returns persisted `PriceSnapshot.observed_at` values without timezone
+  information; UTC normalization is still needed before exposing price history
 - A single-item collection GET operation is not yet implemented
 - Nonpositive quantity, negative purchase price, and missing-variant rejection
   cases are not yet covered by focused `CollectionItem` tests
