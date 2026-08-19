@@ -1,11 +1,11 @@
 import re
-import os 
 import httpx
 
 
 from decimal import Decimal
 from typing import Any
 
+from app.config import get_pokemon_tcg_api_key
 from app.schemas.catalog import (
     CatalogCardSearchResult,
     CatalogSearchResponse,
@@ -122,7 +122,7 @@ def search_pokemon_cards(
     client: httpx.Client | None = None
 ) -> CatalogSearchResponse:
     headers = {
-        "X-Api-Key" : os.environ["POKEMON_TCG_API_KEY"]
+        "X-Api-Key": get_pokemon_tcg_api_key(),
     }
     params = {
         #Quoting the name keeps multi word searches together as one phrase
