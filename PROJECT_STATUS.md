@@ -1,13 +1,13 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 Last environment: macOS desktop
 Branch: `main`
 Roadmap position: The External Card Catalog milestone is underway. The portfolio
 data model now includes catalog cards, immutable variants, owned collection
 items, current variant pricing, and historical price snapshots. Catalog-search
-schemas and the pure Pokemon TCG response mapper are in place; provider HTTP
-search and import persistence remain.
+schemas, the pure Pokemon TCG response mapper, and a mocked HTTP request contract
+are in place; provider service implementation and import persistence remain.
 
 ## Current Checkpoint
 
@@ -54,11 +54,17 @@ search and import persistence remain.
   instead of rebuilding the foreign-key-referenced `card_variants` table
 - Upgraded the development database through the corrected migration to
   `959d95fa90be (head)`
+- Started the Pokemon TCG HTTP integration test-first with a mocked successful
+  search request; no real provider call or API quota is used by the test
+- Defined the expected provider endpoint, API-key header, search parameters,
+  pagination parameters, and mapped Cardfolio response in the new test
 
 ## Verification
 
-- `python -m pytest`: 27 passed with one unrelated Starlette/httpx deprecation
-  warning
+- Last fully implemented suite run: 27 passed with one unrelated
+  Starlette/httpx deprecation warning
+- The committed mocked search test is intentionally pending because
+  `search_pokemon_cards` has not been implemented yet
 - `alembic current`: `959d95fa90be (head)`
 - `alembic check`: no new upgrade operations detected
 - A populated `b947a39991a6 -> head -> b947a39991a6 -> head` migration test
@@ -105,8 +111,8 @@ search and import persistence remain.
 - `User` and collection ownership are not implemented
 - Legacy reference-price fields still live on `CatalogCard` alongside the new
   variant-level pricing fields and need an explicit migration plan
-- The Pokemon TCG service does not yet make HTTP requests, read an API key, or
-  handle timeouts, rate limits, and provider errors
+- A mocked successful Pokemon TCG request contract is committed, but the service
+  does not yet make the request, read the API key, or handle provider failures
 - Catalog search and import routes are not implemented, and selected results are
   not yet persisted as `CatalogCard` and `CardVariant` rows
 - Provider refreshes do not yet update current variant prices or create
@@ -130,10 +136,11 @@ search and import persistence remain.
 
 ## Exact Next Action
 
-Implement the Pokemon TCG service's real `httpx` search request with an
-environment-supplied API key, an explicit timeout, and provider-error
-translation. Follow it with `GET /catalog/search` so the frontend can search
-without contacting the provider directly.
+Implement `search_pokemon_cards` in `app/services/pokemon_tcg.py` to satisfy the
+committed mocked success test: read the environment API key, call the provider
+with the expected search and pagination parameters, and pass the returned JSON
+to the existing mapper. Then add an explicit timeout and provider-error tests
+before exposing the service through `GET /catalog/search`.
 
 When catalog import and refresh are added, update each `CardVariant`'s current
 price fields and append a `PriceSnapshot` without changing owned-card condition

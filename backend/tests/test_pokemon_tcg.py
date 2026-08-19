@@ -76,6 +76,7 @@ def test_map_pokemon_search_response_normalizes_provider_data():
         Decimal("123.45"),
     ]
 
+
 def test_search_pokemon_cards_requests_provider_and_maps_response(
     monkeypatch,
 ):
@@ -83,7 +84,7 @@ def test_search_pokemon_cards_requests_provider_and_maps_response(
     Check that catalog search sends the expected Pokémon TCG request
     and converts the provider response into Cardfolio's response format.
     """
-    
+
     # Use a fake key so the test never depends on a developer's local .env file.
     monkeypatch.setenv(
         "POKEMON_TCG_API_KEY",
