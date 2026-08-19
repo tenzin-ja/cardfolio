@@ -1,20 +1,21 @@
 # Cardfolio Project Status
 
-Last updated: 2026-08-18
-Last environment: macOS desktop
+Last updated: 2026-08-19
+Last environment: Windows desktop
 Branch: `main`
 Roadmap position: The External Card Catalog milestone is underway. The portfolio
 data model now includes catalog cards, immutable variants, owned collection
 items, current variant pricing, and historical price snapshots. Catalog-search
-schemas, the pure Pokemon TCG response mapper, and a mocked HTTP request contract
-are in place; provider service implementation and import persistence remain.
+schemas, the Pokemon TCG response mapper, provider HTTP search, and Git-ignored
+local API-key configuration are in place; provider hardening, the catalog route,
+and import persistence remain.
 
 ## Current Checkpoint
 
 - FastAPI backend with create, list, exact-ID retrieval, partial-update, and
   delete endpoints for the temporary `Card` resource
 - Partial, case-insensitive name filtering and bounded result limits
-- Twenty-six test functions covering twenty-seven cases; database tests use an
+- Twenty-nine test functions covering thirty cases; database tests use an
   isolated in-memory database
 - Alembic `1.18.5` is the only application-schema manager
 - Seven migrations: initial `cards`, required card names, `catalog_cards`,
@@ -35,6 +36,10 @@ are in place; provider service implementation and import persistence remain.
   connected to FastAPI; the selected variant is immutable after creation
 - Catalog-search schemas and Pokemon TCG mapping functions normalize external
   identity, image, pagination, variant, and market-price data
+- `search_pokemon_cards` performs authenticated provider searches with
+  pagination and supports an injected HTTP client for isolated tests
+- Local configuration loads the provider key from a Git-ignored `backend/.env`
+  while allowing deployed environment variables to take priority
 - The variant-pricing migration uses direct SQLite column additions/removals,
   avoiding a table rebuild while preserving linked collection items
 - The pricing migration supplies a database-level `USD` default so existing
@@ -58,13 +63,23 @@ are in place; provider service implementation and import persistence remain.
   search request; no real provider call or API quota is used by the test
 - Defined the expected provider endpoint, API-key header, search parameters,
   pagination parameters, and mapped Cardfolio response in the new test
+- Implemented `search_pokemon_cards` and satisfied the mocked HTTP request
+  contract without making the automated suite depend on the network
+- Added local `.env` loading, a safe committed `.env.example`, a clear
+  configuration error, and focused environment-configuration tests
+- Completed a controlled live provider smoke test that returned normalized card
+  identity, image, variant, and TCGplayer market-price data
 
 ## Verification
 
-- Last fully implemented suite run: 27 passed with one unrelated
-  Starlette/httpx deprecation warning
-- The committed mocked search test is intentionally pending because
-  `search_pokemon_cards` has not been implemented yet
+- `python -m pytest`: 30 passed with one unrelated Starlette/httpx deprecation
+  warning
+- The mocked provider test verified the endpoint, API-key header, name query,
+  pagination parameters, injected client, and normalized response
+- Configuration tests verified environment-key retrieval and a clear error when
+  the required key is absent
+- A live one-result Charizard search returned `gym2-2` (Blaine's Charizard), its
+  image, and separate first-edition and unlimited holofoil market prices
 - `alembic current`: `959d95fa90be (head)`
 - `alembic check`: no new upgrade operations detected
 - A populated `b947a39991a6 -> head -> b947a39991a6 -> head` migration test
@@ -96,6 +111,8 @@ are in place; provider service implementation and import persistence remain.
 - Keep an owned collection item's selected variant immutable after creation
 - Import catalog cards on demand from the Pokemon TCG API
 - Use TCGplayer-derived prices as reference values
+- Keep the Pokemon TCG API as the V1 catalog and baseline raw-price provider;
+  defer richer condition, graded, and historical providers until they are needed
 - Treat each variant's current market price as a shared raw Near Mint baseline
 - Store historical provider observations as `PriceSnapshot` rows per variant
 - Store an owned card's condition without overwriting shared variant pricing
@@ -111,8 +128,8 @@ are in place; provider service implementation and import persistence remain.
 - `User` and collection ownership are not implemented
 - Legacy reference-price fields still live on `CatalogCard` alongside the new
   variant-level pricing fields and need an explicit migration plan
-- A mocked successful Pokemon TCG request contract is committed, but the service
-  does not yet make the request, read the API key, or handle provider failures
+- Pokemon TCG search succeeds, but the service still needs an explicit timeout,
+  provider-error translation, and focused timeout/error tests
 - Catalog search and import routes are not implemented, and selected results are
   not yet persisted as `CatalogCard` and `CardVariant` rows
 - Provider refreshes do not yet update current variant prices or create
@@ -131,16 +148,17 @@ are in place; provider service implementation and import persistence remain.
   currently enforces its canonical values
 - Card-list ordering is not deterministic
 - Offset/cursor pagination is not implemented
-- Root and backend dependency declarations need consolidation
+- `python-dotenv` is currently declared only in the root requirements file even
+  though backend setup installs `backend/requirements.txt`; the dependency
+  declarations need consolidation
 - README and roadmap do not reflect all current V1 decisions
 
 ## Exact Next Action
 
-Implement `search_pokemon_cards` in `app/services/pokemon_tcg.py` to satisfy the
-committed mocked success test: read the environment API key, call the provider
-with the expected search and pagination parameters, and pass the returned JSON
-to the existing mapper. Then add an explicit timeout and provider-error tests
-before exposing the service through `GET /catalog/search`.
+Move the `python-dotenv` pin into `backend/requirements.txt` so a clean backend
+install includes local configuration support. Then add focused tests for an
+explicit provider timeout and translated HTTP/network failures before exposing
+the service through `GET /catalog/search`.
 
 When catalog import and refresh are added, update each `CardVariant`'s current
 price fields and append a `PriceSnapshot` without changing owned-card condition
