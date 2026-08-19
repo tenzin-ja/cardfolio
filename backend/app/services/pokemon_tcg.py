@@ -1,4 +1,8 @@
 import re
+import os 
+import httpx
+
+
 from decimal import Decimal
 from typing import Any
 
@@ -8,6 +12,7 @@ from app.schemas.catalog import (
     CatalogVariantSearchResult,
 )
 
+POKEMON_TCG_CARDS_URL = "https://api.pokemontcg.io/v2/cards"
 
 def normalize_variant_key(provider_key: str) -> str:
     """
@@ -109,3 +114,41 @@ def map_pokemon_search_response(
         count=response_data["count"],
         total_count=response_data["totalCount"],
     )
+
+def search_pokemon_cards(
+    query:str,
+    page: int = 1,
+    page_size: int = 20,
+    client: httpx.Client | None = None
+) -> CatalogSearchResponse:
+    headers = {
+        "X-Api-Key" : os.environ["POKEMON_TCG_API_KEY"]
+    }
+    params = {
+        #Quoting the name keeps multi word searches together as one phrase
+        "q" : f'name:"{query}"',
+        "page": page,
+
+        "pageSize": page_size
+    }
+
+    if client is None:
+        #normal application calls create their own client and close it here
+        with httpx.Client() as default_client:
+            response = default_client.get(
+                POKEMON_TCG_CARDS_URL,
+                headers=headers,
+                params=params,
+            )
+    else:
+        #Tests can send in a mocked client so no real network request is made.
+        #The caller owns this client so this func shouldn't close it 
+        response = client.get(
+            POKEMON_TCG_CARDS_URL,
+            headers=headers,
+            params=params
+        )
+
+    #stops for unsuccessful responses instead of sending error json through regular card data mapper
+    response.raise_for_status()
+    return map_pokemon_search_response(response.json())
