@@ -13,6 +13,7 @@ from app.schemas.catalog import (
 )
 
 POKEMON_TCG_CARDS_URL = "https://api.pokemontcg.io/v2/cards"
+POKEMON_TCG_TIMEOUT_SECONDS = 10.0
 
 def normalize_variant_key(provider_key: str) -> str:
     """
@@ -139,6 +140,7 @@ def search_pokemon_cards(
                 POKEMON_TCG_CARDS_URL,
                 headers=headers,
                 params=params,
+                timeout = POKEMON_TCG_TIMEOUT_SECONDS  
             )
     else:
         #Tests can send in a mocked client so no real network request is made.
@@ -146,7 +148,9 @@ def search_pokemon_cards(
         response = client.get(
             POKEMON_TCG_CARDS_URL,
             headers=headers,
-            params=params
+            params=params,
+            timeout = POKEMON_TCG_TIMEOUT_SECONDS  
+
         )
 
     #stops for unsuccessful responses instead of sending error json through regular card data mapper

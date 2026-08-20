@@ -127,6 +127,14 @@ def test_search_pokemon_cards_requests_provider_and_maps_response(
         # Make sure the service actually sends the key it read from the environment.
         assert request.headers["X-Api-Key"] == "test-api-key"
 
+        # a single float timeout applies the same limit to every HTTP stage
+        assert request.extensions["timeout"] == {
+            "connect": 10.0,
+            "read": 10.0,
+            "write": 10.0,
+            "pool": 10.0
+        }
+
         return httpx.Response(
             status_code=200,
             json=provider_response,

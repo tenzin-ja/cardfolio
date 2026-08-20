@@ -1,7 +1,6 @@
 import os
-from pathlib import Path
-
 from dotenv import load_dotenv
+from pathlib import Path
 
 
 class ConfigurationError(RuntimeError):
@@ -13,7 +12,7 @@ class ConfigurationError(RuntimeError):
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 # A real environment variable takes priority over the local file. Production
-# can therefore inject secrets without depending on a `.env` file.
+# can therefore put in secrets without depending on a `.env` file.
 load_dotenv(dotenv_path=ENV_FILE, override=False)
 
 
