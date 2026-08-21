@@ -15,3 +15,6 @@ app.include_router(cards.router)
 
 # makes the routes defined in collection_items.py available to API clients
 app.include_router(collection_items.router)
+
+#makes the external card catalog search avaliable to api clients
+app.include_router(catalog.router)

@@ -10,11 +10,11 @@ router = APIRouter(
 )
 
 @router.get(
-    "/search"
-    response_model = CatalogSearchReponse
+    "/search",
+    response_model = CatalogSearchResponse
 )
 def search_catalog(
-    query: str = Query(min_lenth = 1, max_length = 100),
+    query: str = Query(min_length = 1, max_length = 100),
     page: int = Query(default = 1, ge = 1),
     page_size: int = Query(default = 20, ge = 1, le = 100)
 )-> CatalogSearchResponse:
@@ -23,7 +23,7 @@ def search_catalog(
     """
 
     # the service reads the api key from the backend env, calls the     
-    # provider, and voncets its response into cardfolio's catalog schema
+    # provider, and converts its response into cardfolio's catalog schema
 
     return search_pokemon_cards(
         query = query,
