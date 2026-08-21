@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app import models # Registsers all SQLAlchemy models
-from app.routers import cards, collection_items
+from app.routers import cards, catalog, collection_items
 
 #Create FastAPI app
 app = FastAPI()
