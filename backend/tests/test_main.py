@@ -1,6 +1,7 @@
 import os
-
+import httpx
 import pytest
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -18,6 +19,8 @@ from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
 from app.models.price_snapshot import PriceSnapshot
 from app.main import app
+from app.config import ConfigurationError
+from app.routers import catalog as catalog_router
 
 #Create a temp in-memory database used only for tests.
 test_engine = create_engine(
@@ -804,3 +807,98 @@ def test_deleting_card_variant_removes_price_snapshots():
 
         # Deleting one finish must not remove its shared catalog card.
         assert db.get(CatalogCard, catalog_card_id) is not None
+
+def test_catalog_search_returns_500_for_missing_configuration(
+    monkeypatch,
+):
+    """Return a safe response when the backend API key is unavailable."""
+
+    def fail_search(**kwargs):
+        raise ConfigurationError("Missing test API key")
+
+    # Patch the function used by the router so this test does not alter .env.
+    monkeypatch.setattr(
+        catalog_router,
+        "search_pokemon_cards",
+        fail_search,
+    )
+
+    response = client.get(
+        "/catalog/search",
+        params={"query": "Pikachu"},
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "The card catalog is not configured"
+    }
+
+
+def test_catalog_search_returns_504_when_provider_times_out(
+    monkeypatch,
+):
+    """Return a gateway timeout when the external provider is too slow."""
+
+    request = httpx.Request(
+        "GET",
+        "https://api.pokemontcg.io/v2/cards",
+    )
+
+    def fail_search(**kwargs):
+        raise httpx.ReadTimeout(
+            "Provider timed out",
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        catalog_router,
+        "search_pokemon_cards",
+        fail_search,
+    )
+
+    response = client.get(
+        "/catalog/search",
+        params={"query": "Pikachu"},
+    )
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "detail": (
+            "The card catalog provider took too long to respond."
+        )
+    }
+
+
+def test_catalog_search_returns_502_when_provider_fails(
+    monkeypatch,
+):
+    """Return a gateway error when the provider cannot be reached."""
+
+    request = httpx.Request(
+        "GET",
+        "https://api.pokemontcg.io/v2/cards",
+    )
+
+    def fail_search(**kwargs):
+        raise httpx.ConnectError(
+            "Unable to connect to provider",
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        catalog_router,
+        "search_pokemon_cards",
+        fail_search,
+    )
+
+    response = client.get(
+        "/catalog/search",
+        params={"query": "Pikachu"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": (
+            "The card catalog provider is currently unavailable."
+        )
+    }
