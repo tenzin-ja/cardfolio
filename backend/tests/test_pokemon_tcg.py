@@ -5,10 +5,10 @@ import httpx
 from decimal import Decimal
 
 from app.services.pokemon_tcg import (
+    get_pokemon_card,
     map_pokemon_search_response,
     search_pokemon_cards,
 )
-
 
 def test_map_pokemon_search_response_normalizes_provider_data():
     provider_response = {
@@ -155,3 +155,64 @@ def test_search_pokemon_cards_requests_provider_and_maps_response(
     assert result.page == 2
     assert result.page_size == 10
     assert result.items[0].name == "Charizard"
+
+def test_get_pokemon_card_requests_exact_card_and_maps_response(
+    monkeypatch,
+):
+    """
+    Retrieve one provider card by ID and normalize its response.
+    """
+
+    monkeypatch.setenv(
+        "POKEMON_TCG_API_KEY",
+        "test-api-key",
+    )
+
+    # A single-card endpoint returns one dictionary under `data`,
+    # rather than the list returned by a search.
+    provider_response = {
+        "data": {
+            "id": "base1-4",
+            "name": "Charizard",
+            "set": {
+                "id": "base1",
+                "name": "Base",
+            },
+            "number": "4",
+            "rarity": "Rare Holo",
+        }
+    }
+
+    def handle_request(
+        request: httpx.Request,
+    ) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.host == "api.pokemontcg.io"
+        assert request.url.path == "/v2/cards/base1-4"
+        assert request.headers["X-Api-Key"] == "test-api-key"
+
+        assert request.extensions["timeout"] == {
+            "connect": 10.0,
+            "read": 10.0,
+            "write": 10.0,
+            "pool": 10.0,
+        }
+
+        return httpx.Response(
+            status_code=200,
+            json=provider_response,
+        )
+
+    transport = httpx.MockTransport(handle_request)
+
+    with httpx.Client(transport=transport) as client:
+        result = get_pokemon_card(
+            provider_card_id="base1-4",
+            client=client,
+        )
+
+    assert result.provider == "pokemon_tcg"
+    assert result.provider_card_id == "base1-4"
+    assert result.name == "Charizard"
+    assert result.set_name == "Base"
+    assert result.card_number == "4"
