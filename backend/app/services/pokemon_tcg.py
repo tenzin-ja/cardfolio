@@ -156,3 +156,42 @@ def search_pokemon_cards(
     #stops for unsuccessful responses instead of sending error json through regular card data mapper
     response.raise_for_status()
     return map_pokemon_search_response(response.json())
+
+def get_pokemon_card(
+    provider_card_id: str,
+    client: httpx.Client | None = None,
+) -> CatalogCardSearchResult:
+    '''
+    Get one card using its provider id
+    '''
+
+    headers = {
+        "X-Api-Key": get_pokemon_tcg_api_key(),
+    }
+    card_url = (
+        f"{POKEMON_TCG_CARDS_URL}/{provider_card_id}"
+    )
+
+    if client is None:
+        #Normal application calls create and close their own http client
+        with httpx.Client() as default_client:
+            response = default_client.get(
+                card_url,
+                headers = headers,
+                timeout = POKEMON_TCG_TIMEOUT_SECONDS
+            )
+    else:
+        #tests and reusable callers can provide a client that they own
+        response = client.get(
+            card_url,                 
+            headers=headers,
+            timeout = POKEMON_TCG_TIMEOUT_SECONDS,
+        )
+
+    response.raise_for_status()
+
+    # a single card reponse contains one dict under 'data'
+    # unlike search responses, where 'data' contains a list
+    card_data = response.json()["data"]
+
+    return map_pokemon_card(card_data)
