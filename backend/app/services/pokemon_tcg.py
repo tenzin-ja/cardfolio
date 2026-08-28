@@ -2,7 +2,7 @@ import re
 import httpx
 
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.config import get_pokemon_tcg_api_key
@@ -14,6 +14,12 @@ from app.schemas.catalog import (
 
 POKEMON_TCG_CARDS_URL = "https://api.pokemontcg.io/v2/cards"
 POKEMON_TCG_TIMEOUT_SECONDS = 10.0
+
+class PokemonTCGResponseError(RuntimeError):
+    '''
+    Raised when the provider responds but cardfolio cannot understand its data
+    '''
+
 
 def normalize_variant_key(provider_key: str) -> str:
     """
@@ -179,7 +185,15 @@ def search_pokemon_cards(
 
     #stops for unsuccessful responses instead of sending error json through regular card data mapper
     response.raise_for_status()
-    return map_pokemon_search_response(response.json())
+
+    try:
+        provider_data = response.json()
+        return map_pokemon_search_response(provider_data)
+    except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
+        # A successful status code is not useful if the body cannot be mapped.
+        raise PokemonTCGResponseError(
+            "The Pokémon TCG API returned an invalid search response."
+        ) from exc
 
 def get_pokemon_card(
     provider_card_id: str,
@@ -213,9 +227,12 @@ def get_pokemon_card(
         )
 
     response.raise_for_status()
+    try:
+        # A single-card response stores one card under `data`, unlike search.
+        card_data = response.json()["data"]
+        return map_pokemon_card(card_data)
+    except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
+        raise PokemonTCGResponseError(
+            "The Pokémon TCG API returned an invalid card response."
+        ) from exc
 
-    # a single card reponse contains one dict under 'data'
-    # unlike search responses, where 'data' contains a list
-    card_data = response.json()["data"]
-
-    return map_pokemon_card(card_data)

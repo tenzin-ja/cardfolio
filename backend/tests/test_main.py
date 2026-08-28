@@ -902,3 +902,28 @@ def test_catalog_search_returns_502_when_provider_fails(
             "The card catalog provider is currently unavailable."
         )
     }
+
+def test_catalog_search_rejects_blank_query(
+    monkeypatch,
+):
+    """
+    Reject a search containing spaces but no actual card name.
+    """
+
+    def fail_if_called(**kwargs):
+        pytest.fail(
+            "The provider should not be called for an empty search."
+        )
+
+    monkeypatch.setattr(
+        catalog_router,
+        "search_pokemon_cards",
+        fail_if_called,
+    )
+
+    response = client.get(
+        "/catalog/search",
+        params={"query": "   "},
+    )
+
+    assert response.status_code == 422

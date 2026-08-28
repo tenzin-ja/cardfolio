@@ -16,7 +16,7 @@ router = APIRouter(
     response_model = CatalogSearchResponse
 )
 def search_catalog(
-    query: str = Query(min_length = 1, max_length = 100),
+    query: str = Query(min_length = 1, max_length = 100, pattern = r".*\S.*"),
     page: int = Query(default = 1, ge = 1),
     page_size: int = Query(default = 20, ge = 1, le = 100)
 )-> CatalogSearchResponse:
