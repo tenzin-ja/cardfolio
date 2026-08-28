@@ -116,20 +116,44 @@ def map_pokemon_search_response(
         total_count=response_data["totalCount"],
     )
 
+def build_pokemon_name_query(query: str) -> str:
+    """
+    Turn a card name entered by the user into a safe provider search phrase.
+    """
+
+    cleaned_query = query.strip()
+
+    # Escape backslashes first so we do not accidentally escape the
+    # backslashes added when protecting quotation marks.
+    escaped_query = cleaned_query.replace("\\", "\\\\")
+    escaped_query = escaped_query.replace('"', '\\"')
+
+    return f'name:"{escaped_query}"'
+
 def search_pokemon_cards(
     query:str,
     page: int = 1,
     page_size: int = 20,
     client: httpx.Client | None = None
 ) -> CatalogSearchResponse:
+
+    """
+    Search the Pokémon TCG catalog by card name.
+
+    Sends an authenticated, paginated request and converts the provider's
+    response into Cardfolio's catalog format. Also can choose to do a mocked
+    HTTP client if you don't want to make a real network request
+    """
+    #Convert the users test into the query format to avoid issues with card name inputs
+    provider_name_query = build_pokemon_name_query(query)
+    
     headers = {
         "X-Api-Key": get_pokemon_tcg_api_key(),
     }
     params = {
-        #Quoting the name keeps multi word searches together as one phrase
-        "q" : f'name:"{query}"',
+    # Turn the name into provider syntax without letting quotes change the search.
+        "q":provider_name_query,
         "page": page,
-
         "pageSize": page_size
     }
 

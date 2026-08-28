@@ -5,6 +5,7 @@ import httpx
 from decimal import Decimal
 
 from app.services.pokemon_tcg import (
+    build_pokemon_name_query,
     get_pokemon_card,
     map_pokemon_search_response,
     search_pokemon_cards,
@@ -216,3 +217,16 @@ def test_get_pokemon_card_requests_exact_card_and_maps_response(
     assert result.name == "Charizard"
     assert result.set_name == "Base"
     assert result.card_number == "4"
+
+def test_build_pokemon_name_query_escapes_provider_syntax():
+    """
+    Keep quotes and backslashes inside the card-name phrase.
+    """
+
+    # Extra spaces are included because search text often comes directly
+    # from something a user typed.
+    result = build_pokemon_name_query(
+        r'  Charizard "Promo" \ Test  '
+    )
+
+    assert result == r'name:"Charizard \"Promo\" \\ Test"'
