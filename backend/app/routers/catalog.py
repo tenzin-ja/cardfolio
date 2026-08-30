@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, HTTPException, status
 
 from app.config import ConfigurationError
 from app.schemas.catalog import CatalogSearchResponse
-from app.services.pokemon_tcg import search_pokemon_cards
+from app.services.pokemon_tcg import PokemonTCGResponseError, search_pokemon_cards
 
 router = APIRouter(
     prefix = "/catalog",
@@ -39,6 +39,14 @@ def search_catalog(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = "The card catalog is not configured",
         ) from exc
+
+    except PokemonTCGResponseError as exc:
+        #The provider replied but sent out unusable data
+        raise HTTPException(
+            status_code = status.HTTP_502_BAD_GATEWAY,
+            detail = "The card catalog provider returned an invalid response."
+        )from exc
+
 
     # a timeout is also a type of HTTPError, so it must be caught first
     except httpx.TimeoutException as exc:
