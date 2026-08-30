@@ -21,6 +21,7 @@ from app.models.price_snapshot import PriceSnapshot
 from app.main import app
 from app.config import ConfigurationError
 from app.routers import catalog as catalog_router
+from app.services.pokemon_tcg import PokemonTCGResponseError
 
 #Create a temp in-memory database used only for tests.
 test_engine = create_engine(
@@ -927,3 +928,28 @@ def test_catalog_search_rejects_blank_query(
     )
 
     assert response.status_code == 422
+
+def test_catalog_search_returns_502_for_invalid_provider_response(monkeypatch):
+    """Return a gateway error when the service reports unusable provider data."""
+
+    def fail_search(**kwargs):
+        """Simulate the service rejecting the provider's response."""
+        raise PokemonTCGResponseError("Invalid test response")
+
+    # Replace the function where the router uses it; no real API call is needed.
+    monkeypatch.setattr(
+        catalog_router,
+        "search_pokemon_cards",
+        fail_search,
+    )
+
+    response = client.get(
+        "/catalog/search",
+        params={"query": "Pikachu"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "The card catalog provider returned an invalid response."
+    }
+

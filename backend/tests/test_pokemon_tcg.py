@@ -1,6 +1,6 @@
 #HTTP client library that communicates with the poke tcg api
 import httpx
-
+import pytest
 
 from decimal import Decimal
 
@@ -9,6 +9,7 @@ from app.services.pokemon_tcg import (
     get_pokemon_card,
     map_pokemon_search_response,
     search_pokemon_cards,
+    PokemonTCGResponseError
 )
 
 def test_map_pokemon_search_response_normalizes_provider_data():
@@ -230,3 +231,22 @@ def test_build_pokemon_name_query_escapes_provider_syntax():
     )
 
     assert result == r'name:"Charizard \"Promo\" \\ Test"'
+
+def test_search_pokemon_cards_rejects_missing_response_fields(monkeypatch):
+    """Reject a successful provider response that is missing search data."""
+
+    # Keep this test independent of the API key in your local .env.
+    monkeypatch.setenv("POKEMON_TCG_API_KEY", "test-api-key")
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        """Return valid JSON without the fields a search response needs."""
+        return httpx.Response(status_code=200, json={})
+
+    transport = httpx.MockTransport(handle_request)
+
+    with httpx.Client(transport=transport) as client:
+        with pytest.raises(
+            PokemonTCGResponseError,
+            match="invalid search response",
+        ):
+            search_pokemon_cards(query="Pikachu", client=client)
