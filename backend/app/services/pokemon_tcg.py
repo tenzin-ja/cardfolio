@@ -35,7 +35,20 @@ def normalize_variant_key(provider_key: str) -> str:
         provider_key,
     ).lower()
 
+def get_optional_provider_object(
+    value: Any,
+    field_name: str 
+) -> dict[str, Any]:
+    '''Allow missing optional objects, but reject unexpected provider types.'''
 
+    # Missing images or prices are normal, recieving a list of string isn't
+    if value is None:
+        return {}
+
+    if not isinstance(value,dict):
+        raise TypeError(f"Expected {field_name} to be an object.")
+
+    return value
 def map_variant_prices(
     card_data: dict[str, Any],
 ) -> list[CatalogVariantSearchResult]:
@@ -45,8 +58,12 @@ def map_variant_prices(
 
     # Some cards do not contain TCGplayer data, so each nested lookup needs a
     # safe empty-dictionary fallback.
-    tcgplayer_data = card_data.get("tcgplayer") or {}
-    provider_prices = tcgplayer_data.get("prices") or {}
+    tcgplayer_data = get_optional_provider_object(
+        card_data.get("tcgplayer"), "tcgplayer"
+    )
+    provider_prices = get_optional_provider_object(
+        tcgplayer_data.get("prices"), "tcgplayer.prices"
+    )
 
     variants = []
 
@@ -89,7 +106,9 @@ def map_pokemon_card(
     """
 
     set_data = card_data["set"]
-    image_data = card_data.get("images") or {}
+    image_data =get_optional_provider_object(
+    card_data.get("images"), "images"
+    )
 
     return CatalogCardSearchResult(
         provider="pokemon_tcg",
