@@ -49,6 +49,7 @@ def get_optional_provider_object(
         raise TypeError(f"Expected {field_name} to be an object.")
 
     return value
+    
 def map_variant_prices(
     card_data: dict[str, Any],
 ) -> list[CatalogVariantSearchResult]:

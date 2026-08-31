@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CatalogVariantSearchResult(BaseModel):
@@ -67,3 +67,17 @@ class CatalogSearchResponse(BaseModel):
     page_size: int = Field(ge=1)
     count: int = Field(ge=0)
     total_count: int = Field(ge=0)
+
+class CatalogImportRequest(BaseModel):
+    '''Identify the provider card to fetch and save in our catalog'''
+
+    #"extra" part rejects any unexpected fields
+    model_config = ConfigDict(extra = "forbid")
+
+    # This id goes into the provider url, so reject path and query seperators
+    provider_card_id: str = Field(
+        min_length = 1,
+        max_length = 100,
+        #restrict id to letters,digits, etc
+        pattern=r"^[A-Za-z0-9_-]+$"
+    )
