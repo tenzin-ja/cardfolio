@@ -81,3 +81,24 @@ class CatalogImportRequest(BaseModel):
         #restrict id to letters,digits, etc
         pattern=r"^[A-Za-z0-9_-]+$"
     )
+
+class CatalogImportVariantResponse(CatalogVariantSearchResult):
+    """Return an imported variant with the ID collection items will reference."""
+
+    id: int
+
+    # The import service returns SQLAlchemy rows rather than dictionaries.
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CatalogImportResponse(CatalogCardSearchResult):
+    """Return the catalog card and variants created or reused by an import."""
+
+    id: int
+
+    # Imported variants include database IDs that search-only results do not have.
+    variants: list[CatalogImportVariantResponse] = Field(
+        default_factory=list
+    )
+
+    model_config = ConfigDict(from_attributes=True)
