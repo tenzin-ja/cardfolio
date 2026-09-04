@@ -11,7 +11,7 @@ from app.models.catalog_card import CatalogCard
 from app.models.card_variant import CardVariant
 # import collection item model
 from app.models.collection_item import CollectionItem
-
+from app.models.price_snapshot import PriceSnapshot
 
 from logging.config import fileConfig
 
@@ -84,9 +84,9 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata,
-            # SQLite cannot directly alter most columns. Batch mode lets Alembic 
-            # rebuild the table while preserving its existing data.
-            render_as_batch=True,
+
+            # PostgreSQL can alter tables directly.
+            render_as_batch=connection.dialect.name == "sqlite",
         )
 
         with context.begin_transaction():
