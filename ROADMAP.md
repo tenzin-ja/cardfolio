@@ -13,6 +13,7 @@ Key outcomes:
 
 - Tests never create or modify the development database.
 - Database configuration is predictable and can be overridden for tests.
+- Development and database tests use PostgreSQL in separate databases.
 - Pydantic and SQLAlchemy enforce consistent data rules.
 - Development and test dependencies have one clear setup.
 
@@ -84,7 +85,7 @@ Key outcomes:
 
 - User accounts and collection ownership
 - Authentication and authorization
-- PostgreSQL and production deployment
+- Production deployment with PostgreSQL
 - Automated CI checks
 - Expanded portfolio analytics
 
