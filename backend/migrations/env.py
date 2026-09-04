@@ -24,10 +24,12 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
-# Use the same database configuration as the FastAPI application instead of
-# maintaining a separate migration-only database address.
-config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
-
+# Alembic's INI parser treats percent signs specially. Escape them here
+# so URL-encoded passwords survive being passed through the configuration.
+config.set_main_option(
+    "sqlalchemy.url",
+    SQLALCHEMY_DATABASE_URL.replace("%", "%%"),
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -83,15 +85,14 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata,
-
-            # PostgreSQL can alter tables directly.
-            render_as_batch=connection.dialect.name == "sqlite",
+            connection=connection,
+            target_metadata=target_metadata,
         )
 
         with context.begin_transaction():
             context.run_migrations()
 
+        
 
 if context.is_offline_mode():
     run_migrations_offline()

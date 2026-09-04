@@ -3,15 +3,39 @@ import httpx
 import pytest
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine,text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 
-#The application engine is created while app modules are imported, so this 
-#override must be set before impoting the database or FastApi application
-os.environ["DATABASE_URL"] = "sqlite://"
+#Importing config loads backend/.env before we read the test setting
+from app.config import ConfigurationError
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "").strip()
+
+if not TEST_DATABASE_URL:
+    raise RuntimeError(
+        "TEST_DATABASE_URL is required. Configure your cardfolio_test database."
+    )
+
+test_database_url = make_url(TEST_DATABASE_URL)
+
+# These tests delete tables. Refuse any target outside our local test database.
+if (
+    test_database_url.drivername != "postgresql+psycopg"
+    or test_database_url.database != "cardfolio_test"
+    or test_database_url.host not in {"localhost", "127.0.0.1", "::1"}
+    or test_database_url.query
+):
+    raise RuntimeError(
+        "Tests require a local PostgreSQL database named cardfolio_test "
+        "with no URL query parameters."
+    )
+
+# The application creates its engine during import, so select the test
+# database before importing database.py or the FastAPI application.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app.db.database import Base, get_db
 from app.models.catalog_card import CatalogCard
@@ -19,16 +43,11 @@ from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
 from app.models.price_snapshot import PriceSnapshot
 from app.main import app
-from app.config import ConfigurationError
 from app.routers import catalog as catalog_router
 from app.services.pokemon_tcg import PokemonTCGResponseError
 
-#Create a temp in-memory database used only for tests.
-test_engine = create_engine(
-    "sqlite://",
-    connect_args = {"check_same_thread": False},
-    poolclass = StaticPool
-)
+# Use the dedicated PostgreSQL database validated above.
+test_engine = create_engine(TEST_DATABASE_URL)
 
 TestingSessionLocal = sessionmaker(
     autocommit = False,
@@ -36,23 +55,26 @@ TestingSessionLocal = sessionmaker(
     bind = test_engine
 )
 
-#Create the card table insde the test datebase
-Base.metadata.create_all(bind = test_engine)
-
 @pytest.fixture(autouse=True)
 def reset_test_database():
-    """
-    Start every test with a fresh, empty database.
-    """
+    """Give each test fresh tables in the dedicated test database."""
 
-    #deletes the old test tables and creates fresh empty ones.
+    # Check the actual connection before allowing any table deletion.
+    with test_engine.connect() as connection:
+        database_name = connection.execute(
+            text("SELECT current_database()")
+        ).scalar_one()
+
+    if database_name != "cardfolio_test":
+        raise RuntimeError("Refusing to clear a database other than cardfolio_test.")
+
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
 
-    yield
-    #deletes everything again
-    Base.metadata.drop_all(bind=test_engine)
-
+    try:
+        yield
+    finally:
+        Base.metadata.drop_all(bind=test_engine)
 # Replace the real database session with the test database session.
 def override_get_db():
     db = TestingSessionLocal()
