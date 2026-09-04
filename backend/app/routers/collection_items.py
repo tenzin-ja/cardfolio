@@ -74,8 +74,8 @@ def get_collection_items(
     Return saved collection items in a stable order.
     """
 
-    #SQLite does not gaurantee row order unless order_by() is included
-    #Ordering by ID gives clients predictable results between requests
+    # Databases do not guarantee row order without an explicit sort.
+    # Ordering by ID gives clients predictable results between requests.
     return(
         db.query(CollectionItem)
         .order_by(CollectionItem.id)

@@ -14,9 +14,8 @@ class CardBase(BaseModel):
     condition: str | None = Field(default = None, max_length = 50)
     price: float | None = Field(default = None, ge = 0)
 
-    '''User sends a Json -> Cardcreate checks the incoming data-> Card Model turns it into a dataBase Object
-       SQLAlchemy saves it to SQLite - > CardResponse controls what gets sent back.
-    '''
+# CardCreate validates incoming JSON. The route builds a Card model and saves
+# it through SQLAlchemy; CardResponse defines the fields returned to the client.
 class CardCreate(CardBase):
     pass
 

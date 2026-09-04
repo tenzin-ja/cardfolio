@@ -4,8 +4,7 @@ from sqlalchemy import Column, Integer, String, Float
 from app.db.database import Base
 
 
-# Creating a Card class that inherits properties from Base
-# Card model is how a card will be stored in SQLite
+# This model defines the cards table stored in PostgreSQL.
 class Card(Base):
     __tablename__ = "cards"
 
