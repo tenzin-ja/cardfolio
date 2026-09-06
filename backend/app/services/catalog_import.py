@@ -38,45 +38,46 @@ def import_catalog_card(
         db.add(catalog_card)
         db.flush()
 
-        #Create variants the card doesn't already have
-        #Take the cards existing variants and organize them by their key
-        variants_by_key = {
-            variant.variant_key: variant
-            for variant in catalog_card.variants
-        }
+    #Create variants the card doesn't already have
+    
+    #Take the cards existing variants and organize them by their key
+    variants_by_key = {
+        variant.variant_key: variant
+        for variant in catalog_card.variants
+    }
 
-        for provider_variant in provider_card.variants:
-            variant = variants_by_key.get(provider_variant.variant_key)
+    for provider_variant in provider_card.variants:
+        variant = variants_by_key.get(provider_variant.variant_key)
 
-            if variant is None:
-                variant = CardVariant(
-                    catalog_card = catalog_card,
-                    variant_key = provider_variant.variant_key,
-                    currency = provider_variant.currency
-                )
-
-                db.add(variant)
-                variants_by_key[provider_variant.variant_key] = variant
-
-        #this block runs as long as there is existing market price data for the variant, 0 inclusive
-        if provider_variant.market_price is not None:
-            observed_at = datetime.now(timezone.utc)
-
-            variant.market_price = provider_variant.market_price
-            variant.market_price_source = PRICE_SOURCE
-            variant.market_price_updated_at = observed_at
-
-            snapshot = PriceSnapshot(
-                card_variant=variant,
-                market_price=provider_variant.market_price,
-                currency=provider_variant.currency,
-                source=PRICE_SOURCE,
-                observed_at=observed_at
+        if variant is None:
+            variant = CardVariant(
+                catalog_card = catalog_card,
+                variant_key = provider_variant.variant_key,
+                currency = provider_variant.currency
             )
 
-            db.add(snapshot)
-        db.commit()
-        db.refresh(catalog_card)
+            db.add(variant)
+            variants_by_key[provider_variant.variant_key] = variant
 
-        return catalog_card
+            #this block runs as long as there is existing market price data for the variant, 0 inclusive
+            if provider_variant.market_price is not None:
+                observed_at = datetime.now(timezone.utc)
+
+                variant.market_price = provider_variant.market_price
+                variant.market_price_source = PRICE_SOURCE
+                variant.market_price_updated_at = observed_at
+
+                snapshot = PriceSnapshot(
+                    card_variant=variant,
+                    market_price=provider_variant.market_price,
+                    currency=provider_variant.currency,
+                    source=PRICE_SOURCE,
+                    observed_at=observed_at
+                )
+
+                db.add(snapshot)
+    db.commit()
+    db.refresh(catalog_card)
+
+    return catalog_card
 
