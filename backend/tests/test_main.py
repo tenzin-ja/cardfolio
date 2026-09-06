@@ -974,3 +974,28 @@ def test_catalog_search_returns_502_for_invalid_provider_response(monkeypatch):
     assert response.json() == {
         "detail": "The card catalog provider returned an invalid response."
     }
+
+@pytest.mark.parametrize("method,path,payload", [
+    (
+        "POST",
+        "/collection-items",
+        {
+            "card_variant_id": 1,
+            "condition": "near_mint",
+            "quantity": 2_147_483_648,
+        },
+    ),
+    (
+        "PATCH",
+        "/collection-items/1",
+        {"quantity": 2_147_483_648},
+    ),
+])
+def test_collection_item_rejects_quantity_overflow(method, path, payload):
+    response = client.request(method, path, json=payload)
+
+    assert response.status_code == 422
+    assert any(
+        error["loc"] == ["body", "quantity"]
+        for error in response.json()["detail"]
+    )

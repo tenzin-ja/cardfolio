@@ -22,9 +22,8 @@ class CollectionItemCreate(BaseModel):
 
     condition: CardCondition
 
-    #These defaults match the SQLAlchemy model. Repeating the validatino here 
-    #lets the API return a clear 422 response before reaching the database
-    quantity: int = Field(default = 1, gt = 0)
+    #These defaults match the SQLAlchemy model. Set the max value to postgresql max limit
+    quantity: int = Field(default=1, gt=0, le=2_147_483_647)
 
     # Decimal is used for money because float can introduce rounding errors.
     # This field stores the price of one card, not the total lot price
@@ -59,7 +58,7 @@ class CollectionItemUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     condition: CardCondition | None = None
-    quantity: int | None = Field(default=None, gt=0)
+    quantity: int | None = Field(default=None, gt=0, le=2_147_483_647)
 
     # These fields may explicitly be set to null to clear saved purchase data.
     purchase_price_per_card: Decimal | None = Field(
