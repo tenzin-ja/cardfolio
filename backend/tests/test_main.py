@@ -45,7 +45,11 @@ from app.models.price_snapshot import PriceSnapshot
 from app.main import app
 from app.routers import catalog as catalog_router
 from app.services.pokemon_tcg import PokemonTCGResponseError
-
+from app.services.catalog_import import import_catalog_card
+from app.schemas.catalog import(
+    CatalogCardSearchResult,
+    CatalogVariantSearchResult
+)
 # Use the dedicated PostgreSQL database validated above.
 test_engine = create_engine(TEST_DATABASE_URL)
 
@@ -999,3 +1003,95 @@ def test_collection_item_rejects_quantity_overflow(method, path, payload):
         error["loc"] == ["body", "quantity"]
         for error in response.json()["detail"]
     )
+
+def test_import_catalog_card_saves_new_card():
+    provider_card = CatalogCardSearchResult(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+        variants=[
+            CatalogVariantSearchResult(
+                variant_key="holofoil",
+                market_price=Decimal("25.50"),
+            ),
+            CatalogVariantSearchResult(
+                variant_key="normal",
+                market_price=None,
+            ),
+        ],
+    )
+
+    # Import the card and remember its database ID.
+    with TestingSessionLocal() as db:
+        imported_card = import_catalog_card(db, provider_card)
+        card_id = imported_card.id
+
+    # Open another session to verify the records were committed.
+    with TestingSessionLocal() as db:
+        saved_card = db.query(CatalogCard).one()
+
+        assert saved_card.id == card_id
+        assert saved_card.provider == "pokemon_tcg"
+        assert saved_card.provider_card_id == "base1-4"
+        assert saved_card.name == "Charizard"
+
+        variants = {
+            variant.variant_key: variant
+            for variant in saved_card.variants
+        }
+
+        assert set(variants) == {"holofoil", "normal"}
+        assert variants["holofoil"].market_price == Decimal("25.50")
+        assert variants["holofoil"].market_price_source == "tcgplayer"
+        assert variants["normal"].market_price is None
+
+        snapshot = db.query(PriceSnapshot).one()
+
+        assert snapshot.card_variant_id == variants["holofoil"].id
+        assert snapshot.market_price == Decimal("25.50")
+        assert snapshot.currency == "USD"
+        assert snapshot.source == "tcgplayer"
+        assert snapshot.observed_at is not None
+        assert (
+            snapshot.observed_at
+            == variants["holofoil"].market_price_updated_at
+        )
+
+def test_import_catalog_card_reuses_existing_records():
+    provider_card = CatalogCardSearchResult(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+        variants=[
+            CatalogVariantSearchResult(
+                variant_key="holofoil",
+                market_price=Decimal("25.50"),
+            ),
+        ],
+    )
+
+    # First import: save the IDs of the created records.
+    with TestingSessionLocal() as db:
+        first_card = import_catalog_card(db, provider_card)
+
+        card_id = first_card.id
+        variant_id = db.query(CardVariant).one().id
+        snapshot_id = db.query(PriceSnapshot).one().id
+
+    # Import the same provider card through a fresh session.
+    with TestingSessionLocal() as db:
+        second_card = import_catalog_card(db, provider_card)
+
+        assert second_card.id == card_id
+
+    # Verify that each table still contains the original record.
+    with TestingSessionLocal() as db:
+        assert db.query(CatalogCard).one().id == card_id
+        assert db.query(CardVariant).one().id == variant_id
+        assert db.query(PriceSnapshot).one().id == snapshot_id
