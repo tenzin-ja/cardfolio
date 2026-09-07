@@ -1,11 +1,21 @@
 import httpx
 
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, Query, Depends, HTTPException, status
+from sqlalchemy.orm import Session 
 
 from app.config import ConfigurationError
-from app.schemas.catalog import CatalogSearchResponse
-from app.services.pokemon_tcg import PokemonTCGResponseError, search_pokemon_cards
-
+from app.db.database import get_db
+from app.services.catalog_import import import_catalog_card
+from app.schemas.catalog import ( 
+    CatalogSearchResponse,
+    CatalogImportResponse,
+    CatalogImportRequest,
+)
+from app.services.pokemon_tcg import (
+    PokemonTCGResponseError,
+    search_pokemon_cards,
+    get_pokemon_card
+)
 router = APIRouter(
     prefix = "/catalog",
     tags = ["catalog"]
@@ -60,3 +70,16 @@ def search_catalog(
             status_code = status.HTTP_502_BAD_GATEWAY,
             detail = "The card catalog provider is currently unavailable.",
         ) from exc
+
+@router.post(
+    "/import",
+    response_model=CatalogImportResponse,
+)
+def import_catalog(
+    request: CatalogImportRequest,
+    db: Session = Depends(get_db)
+):
+    '''Fetch a provider card and save it in the local catalog'''
+    provider_card = get_pokemon_card(request.provider_card_id)
+
+    return import_catalog_card(db,provider_card)
