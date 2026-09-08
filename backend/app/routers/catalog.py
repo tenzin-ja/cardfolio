@@ -92,7 +92,7 @@ def import_catalog(
     except PokemonTCGResponseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="The card catalog provider returned an invalid response.."
+            detail="The card catalog provider returned an invalid response."
         )from exc
 
     except httpx.TimeoutException as exc:

@@ -1095,3 +1095,61 @@ def test_import_catalog_card_reuses_existing_records():
         assert db.query(CatalogCard).one().id == card_id
         assert db.query(CardVariant).one().id == variant_id
         assert db.query(PriceSnapshot).one().id == snapshot_id
+
+def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch):
+    provider_card = CatalogCardSearchResult(
+        provider="pokemon_tcg",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+        variants=[
+            CatalogVariantSearchResult(
+                variant_key="holofoil",
+                market_price=Decimal("25.50"),
+            ),
+        ],
+    )
+
+    def fake_get_pokemon_card(provider_card_id):
+        assert provider_card_id == "base1-4"
+        return provider_card
+
+    # Replace the provider lookup where the router uses it. The HTTP route,
+    # response serialization, and PostgreSQL persistence still run normally.
+    monkeypatch.setattr(
+        catalog_router,
+        "get_pokemon_card",
+        fake_get_pokemon_card,
+    )
+
+    response = client.post(
+        "/catalog/import",
+        json={"provider_card_id": "base1-4"},
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["provider_card_id"] == "base1-4"
+    assert body["name"] == "Charizard"
+    assert len(body["variants"]) == 1
+
+    returned_variant = body["variants"][0]
+    assert returned_variant["variant_key"] == "holofoil"
+    assert Decimal(returned_variant["market_price"]) == Decimal("25.50")
+    assert returned_variant["currency"] == "USD"
+
+    # A separate session confirms that the returned IDs belong to committed
+    # records, including the variant a collection item will reference.
+    with TestingSessionLocal() as db:
+        saved_card = db.query(CatalogCard).one()
+        saved_variant = db.query(CardVariant).one()
+        snapshot = db.query(PriceSnapshot).one()
+
+        assert body["id"] == saved_card.id
+        assert returned_variant["id"] == saved_variant.id
+        assert saved_variant.catalog_card_id == saved_card.id
+        assert snapshot.card_variant_id == saved_variant.id
+        assert snapshot.market_price == Decimal("25.50")

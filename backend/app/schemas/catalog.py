@@ -53,20 +53,29 @@ class CatalogCardSearchResult(BaseModel):
         default_factory=list
     )
 
+class CatalogCardSummary(BaseModel):
+    '''Basic card information shown in catalog search results'''
 
+    provider: str
+    provider_card_id: str
+    name: str
+    card_numbe: str
+
+    #some providers results have no image. the frontend can show a placeholder for those
+    image_url: str | None = None
 class CatalogSearchResponse(BaseModel):
-    """
-    Complete paginated response returned from Cardfolio to the frontend.
-    """
-
-    # Cardfolio calls this `items` instead of exposing the provider's `data`
-    # field directly.
-    items: list[CatalogCardSearchResult]
+    '''A page of catalog search results'''
+    items: list[CatalogCardSummary]
 
     page: int = Field(ge=1)
     page_size: int = Field(ge=1)
+
+    #Number of cards returned in this page
     count: int = Field(ge=0)
-    total_count: int = Field(ge=0)
+
+    #Tcgdex doesn't provide a total in its search response
+    #None means unkwon, zero would incorrectly mean no matching cards exist
+    total_count = int | None = Field(default=None, ge=0)
 
 class CatalogImportRequest(BaseModel):
     '''Identify the provider card to fetch and save in our catalog'''
