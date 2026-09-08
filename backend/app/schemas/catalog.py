@@ -59,7 +59,7 @@ class CatalogCardSummary(BaseModel):
     provider: str
     provider_card_id: str
     name: str
-    card_numbe: str
+    card_number: str
 
     #some providers results have no image. the frontend can show a placeholder for those
     image_url: str | None = None
@@ -75,7 +75,7 @@ class CatalogSearchResponse(BaseModel):
 
     #Tcgdex doesn't provide a total in its search response
     #None means unkwon, zero would incorrectly mean no matching cards exist
-    total_count = int | None = Field(default=None, ge=0)
+    total_count: int | None = Field(default=None, ge=0)
 
 class CatalogImportRequest(BaseModel):
     '''Identify the provider card to fetch and save in our catalog'''
