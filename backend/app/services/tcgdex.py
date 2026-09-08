@@ -1,6 +1,14 @@
 import httpx
+from decimal import Decimal, InvalidOperation
 
-from app.schemas.catalog import CatalogCardSummary, CatalogSearchResponse
+import httpx
+
+from app.schemas.catalog import (
+    CatalogCardSearchResult,
+    CatalogCardSummary,
+    CatalogSearchResponse,
+    CatalogVariantSearchResult,
+)
 
 
 TCGDEX_CARDS_URL = "https://api.tcgdex.net/v2/en/cards"
@@ -83,4 +91,96 @@ def search_tcgdex_cards(
     except (KeyError, TypeError, ValueError) as exc:
         raise TCGdexResponseError(
             "TCGdex returned an invalid search response."
+        ) from exc
+
+
+def map_tcgdex_card(card_data: dict) -> CatalogCardSearchResult:
+    # Reuse the basic fields we already map for search results.
+    summary = map_tcgdex_card_summary(card_data)
+    variants = []
+
+    price_keys = {
+        "normal": "normal",
+        "holo": "holofoil",
+        "reverse": "reverse-holofoil",
+    }
+
+    detailed_variants = card_data.get("variants_detailed") or []
+
+    if not isinstance(detailed_variants, list):
+        raise TypeError("Expected a list of detailed variants.")
+
+    for variant_data in detailed_variants:
+        if not isinstance(variant_data, dict):
+            raise TypeError("Expected a variant object.")
+
+        # The provider's ID keeps different editions of the same finish separate.
+        variant_key = variant_data["variantId"]
+
+        if not isinstance(variant_key, str) or not 1 <= len(variant_key) <= 50:
+            raise ValueError("Invalid variant ID.")
+
+        pricing = variant_data.get("pricing") or {}
+        tcgplayer = pricing.get("tcgplayer") or {}
+        price_key = price_keys.get(variant_data["type"])
+        market_price = None
+
+        # Only use a matching finish from this variant's own USD pricing.
+        # Missing prices stay unknown, we don't borrow another edition's price.
+        if price_key is not None and tcgplayer.get("unit") == "USD":
+            price_data = tcgplayer.get(price_key) or {}
+            raw_price = price_data.get("marketPrice")
+
+            if raw_price is not None:
+                market_price = Decimal(str(raw_price))
+
+        variants.append(
+            CatalogVariantSearchResult(
+                variant_key=variant_key,
+                market_price=market_price,
+                currency="USD",
+            )
+        )
+
+    return CatalogCardSearchResult(
+        **summary.model_dump(),
+        set_id=card_data["set"]["id"],
+        set_name=card_data["set"]["name"],
+        rarity=card_data.get("rarity"),
+        variants=variants,
+    )
+
+
+def get_tcgdex_card(
+    provider_card_id: str,
+    client: httpx.Client | None = None,
+) -> CatalogCardSearchResult:
+    url = f"{TCGDEX_CARDS_URL}/{provider_card_id}"
+
+    if client is None:
+        with httpx.Client() as default_client:
+            response = default_client.get(
+                url,
+                timeout=TCGDEX_TIMEOUT_SECONDS,
+            )
+    else:
+        response = client.get(
+            url,
+            timeout=TCGDEX_TIMEOUT_SECONDS,
+        )
+
+    # Keep HTTP errors separate so the router can recognize a missing card.
+    response.raise_for_status()
+
+    try:
+        return map_tcgdex_card(response.json())
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        InvalidOperation,
+    ) as exc:
+        raise TCGdexResponseError(
+            "TCGdex returned an invalid card response."
         ) from exc
