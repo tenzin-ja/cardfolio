@@ -80,6 +80,46 @@ def import_catalog(
     db: Session = Depends(get_db)
 ):
     '''Fetch a provider card and save it in the local catalog'''
-    provider_card = get_pokemon_card(request.provider_card_id)
+    try: 
+        provider_card = get_pokemon_card(request.provider_card_id)
 
+    except ConfigurationError as exc:
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "The card catalog is not configured",
+        ) from exc
+
+    except PokemonTCGResponseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The card catalog provider returned an invalid response.."
+        )from exc
+
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The card catalog provider took too long to respond."
+        )from exc
+
+    except httpx.HTTPStatusError as exc:
+        #A missing card deserved a 404. Other provider errors do not 
+        #mean the users request was wrong
+        if exc.response.status_code == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(
+                status_code = status.HTTP_404_NOT_FOUND,
+                detail = "The requested card was not found in the provider catalog."
+            )from exc
+        raise HTTPException(
+            status_code = status.HTTP_502_BAD_GATEWAY,
+            detail = "The card catalog provider is currently unavailable."
+        )from exc
+
+    except httpx.HTTPError as exc:
+        # catch connection failures after the http errors
+        raise HTTPException(
+            status_code = status.HTTP_502_BAD_GATEWAY,
+            detail = "The card catalog provider is currently unavailable."
+        )from exc
+    
+    # save only after the provider request and response mapping succeed
     return import_catalog_card(db,provider_card)
