@@ -8,8 +8,8 @@ class CatalogVariantSearchResult(BaseModel):
     One purchasable version returned for a catalog card.
     """
 
-    # Cardfolio will normalize provider keys such as reverseHolofoil into
-    # stable values such as reverse_holofoil.
+    # Identifies one version of a card
+    # TCGdex supplies its variantId here
     variant_key: str
 
     # Prices are represented as Decimal to avoid floating-point rounding.
@@ -28,7 +28,7 @@ class CatalogCardSearchResult(BaseModel):
     """
 
     # Identifies where this catalog data originated.
-    provider: str = "pokemon_tcg"
+    provider: str
 
     # Maps from the Pokemon API card's unique `id`.
     provider_card_id: str
@@ -39,7 +39,7 @@ class CatalogCardSearchResult(BaseModel):
     set_id: str
     set_name: str
 
-    # Maps from the provider's `number` field.
+    # The card's printed number within its set
     card_number: str
 
     rarity: str | None = None

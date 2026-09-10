@@ -27,16 +27,3 @@ def get_database_url() -> str:
         )
 
     return database_url
-
-def get_pokemon_tcg_api_key() -> str:
-    """Return the Pokémon TCG key or explain how to configure it."""
-
-    api_key = os.getenv("POKEMON_TCG_API_KEY", "").strip()
-
-    if not api_key:
-        raise ConfigurationError(
-            "POKEMON_TCG_API_KEY is not configured. "
-            "Add it to backend/.env or provide it as an environment variable."
-        )
-
-    return api_key

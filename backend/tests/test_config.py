@@ -1,22 +1,24 @@
 import pytest
 
-from app.config import (
-    ConfigurationError,
-    get_pokemon_tcg_api_key,
-)
+from app.config import ConfigurationError, get_database_url
 
 
-def test_get_pokemon_tcg_api_key_reads_environment(monkeypatch):
-    monkeypatch.setenv("POKEMON_TCG_API_KEY", "test-api-key")
+def test_get_database_url_reads_environment(monkeypatch):
+    # This only checks configuration; it doesn't connect to the database.
+    database_url = (
+        "postgresql+psycopg://test_user:test_password"
+        "@localhost:5432/cardfolio_test"
+    )
+    monkeypatch.setenv("DATABASE_URL", database_url)
 
-    assert get_pokemon_tcg_api_key() == "test-api-key"
+    assert get_database_url() == database_url
 
 
-def test_get_pokemon_tcg_api_key_explains_missing_configuration(monkeypatch):
-    monkeypatch.delenv("POKEMON_TCG_API_KEY", raising=False)
+def test_get_database_url_explains_missing_configuration(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
 
     with pytest.raises(
         ConfigurationError,
-        match="POKEMON_TCG_API_KEY is not configured",
+        match="DATABASE_URL is not configured",
     ):
-        get_pokemon_tcg_api_key()
+        get_database_url()

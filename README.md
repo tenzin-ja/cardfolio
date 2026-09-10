@@ -121,10 +121,10 @@ These are one-time setup commands. Reuse the existing login and databases if
 you have already created them.
 
 Create `backend/.env` using `backend/.env.example` as a template. Fill in the
-Pokémon TCG API key and the database password:
+database password in both database URLs. Catalog requests use TCGdex and do
+not require an API key.
 
 ```dotenv
-POKEMON_TCG_API_KEY=replace-with-your-key
 DATABASE_URL=postgresql+psycopg://cardfolio_app:ENCODED_PASSWORD@localhost:5432/cardfolio
 TEST_DATABASE_URL=postgresql+psycopg://cardfolio_app:ENCODED_PASSWORD@localhost:5432/cardfolio_test
 ```

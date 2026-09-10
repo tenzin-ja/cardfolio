@@ -9,8 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 
-#Importing config loads backend/.env before we read the test setting
-from app.config import ConfigurationError
+# Load backend/.env before reading TEST_DATABASE_URL.
+import app.config
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "").strip()
 
@@ -44,7 +44,7 @@ from app.models.collection_item import CollectionItem
 from app.models.price_snapshot import PriceSnapshot
 from app.main import app
 from app.routers import catalog as catalog_router
-from app.services.pokemon_tcg import PokemonTCGResponseError
+from app.services.tcgdex import TCGdexResponseError
 from app.services.catalog_import import import_catalog_card
 from app.schemas.catalog import(
     CatalogCardSearchResult,
@@ -374,7 +374,7 @@ def test_catalog_card_rejects_duplicate_provider_identity():
     A provider card may be imported only once into the catalog.
     """
     first_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -383,7 +383,7 @@ def test_catalog_card_rejects_duplicate_provider_identity():
     )
 
     duplicate_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard duplicate",
         set_id="base1",
@@ -405,7 +405,7 @@ def test_catalog_card_rejects_duplicate_provider_identity():
 #Testing card variant model. Verifying duplicate variants aren't possible
 def test_card_variant_rejects_duplicate_variant_for_same_catalog_card():
     first_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -455,7 +455,7 @@ def test_card_variant_rejects_missing_catalog_card():
 def test_collection_item_can_be_saved():
 
     first_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -485,7 +485,7 @@ def test_collection_item_can_be_saved():
 
 def test_collection_item_rejects_invalid_condition():
     first_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -514,7 +514,7 @@ def test_collection_item_rejects_invalid_condition():
 
 def test_create_collection_item_endpoint():
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -557,7 +557,7 @@ def test_create_collection_item_endpoint():
 
 def test_get_collection_items_respects_limit_and_id_order():
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -616,7 +616,7 @@ def test_get_collection_items_respects_limit_and_id_order():
 
 def test_update_collection_item_changes_only_supplied_fields():
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -673,7 +673,7 @@ def test_update_collection_item_changes_only_supplied_fields():
 
 def test_delete_collection_item_removes_item_but_preserves_variant():
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -725,7 +725,7 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
 def test_price_snapshot_can_be_saved():
     """Save a variant price observation and check what should be its auto defaults."""
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -760,7 +760,7 @@ def test_price_snapshot_can_be_saved():
 def test_price_snapshot_rejects_negative_market_price():
     """Reject negative historical prices at the database boundary."""
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -792,7 +792,7 @@ def test_price_snapshot_rejects_negative_market_price():
 def test_deleting_card_variant_removes_price_snapshots():
     """Delete a variant's price history while preserving its catalog card."""
     catalog_card = CatalogCard(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -835,31 +835,6 @@ def test_deleting_card_variant_removes_price_snapshots():
         # Deleting one finish must not remove its shared catalog card.
         assert db.get(CatalogCard, catalog_card_id) is not None
 
-def test_catalog_search_returns_500_for_missing_configuration(
-    monkeypatch,
-):
-    """Return a safe response when the backend API key is unavailable."""
-
-    def fail_search(**kwargs):
-        raise ConfigurationError("Missing test API key")
-
-    # Patch the function used by the router so this test does not alter .env.
-    monkeypatch.setattr(
-        catalog_router,
-        "search_pokemon_cards",
-        fail_search,
-    )
-
-    response = client.get(
-        "/catalog/search",
-        params={"query": "Pikachu"},
-    )
-
-    assert response.status_code == 500
-    assert response.json() == {
-        "detail": "The card catalog is not configured"
-    }
-
 
 def test_catalog_search_returns_504_when_provider_times_out(
     monkeypatch,
@@ -868,7 +843,7 @@ def test_catalog_search_returns_504_when_provider_times_out(
 
     request = httpx.Request(
         "GET",
-        "https://api.pokemontcg.io/v2/cards",
+        "https://api.tcgdex.net/v2/en/cards",
     )
 
     def fail_search(**kwargs):
@@ -879,7 +854,7 @@ def test_catalog_search_returns_504_when_provider_times_out(
 
     monkeypatch.setattr(
         catalog_router,
-        "search_pokemon_cards",
+        "search_tcgdex_cards",
         fail_search,
     )
 
@@ -903,7 +878,7 @@ def test_catalog_search_returns_502_when_provider_fails(
 
     request = httpx.Request(
         "GET",
-        "https://api.pokemontcg.io/v2/cards",
+        "https://api.tcgdex.net/v2/en/cards",
     )
 
     def fail_search(**kwargs):
@@ -914,7 +889,7 @@ def test_catalog_search_returns_502_when_provider_fails(
 
     monkeypatch.setattr(
         catalog_router,
-        "search_pokemon_cards",
+        "search_tcgdex_cards",
         fail_search,
     )
 
@@ -944,7 +919,7 @@ def test_catalog_search_rejects_blank_query(
 
     monkeypatch.setattr(
         catalog_router,
-        "search_pokemon_cards",
+        "search_tcgdex_cards",
         fail_if_called,
     )
 
@@ -960,12 +935,12 @@ def test_catalog_search_returns_502_for_invalid_provider_response(monkeypatch):
 
     def fail_search(**kwargs):
         """Simulate the service rejecting the provider's response."""
-        raise PokemonTCGResponseError("Invalid test response")
+        raise TCGdexResponseError("Invalid test response")
 
     # Replace the function where the router uses it; no real API call is needed.
     monkeypatch.setattr(
         catalog_router,
-        "search_pokemon_cards",
+        "search_tcgdex_cards",
         fail_search,
     )
 
@@ -1006,7 +981,7 @@ def test_collection_item_rejects_quantity_overflow(method, path, payload):
 
 def test_import_catalog_card_saves_new_card():
     provider_card = CatalogCardSearchResult(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -1034,7 +1009,7 @@ def test_import_catalog_card_saves_new_card():
         saved_card = db.query(CatalogCard).one()
 
         assert saved_card.id == card_id
-        assert saved_card.provider == "pokemon_tcg"
+        assert saved_card.provider == "tcgdex"
         assert saved_card.provider_card_id == "base1-4"
         assert saved_card.name == "Charizard"
 
@@ -1062,7 +1037,7 @@ def test_import_catalog_card_saves_new_card():
 
 def test_import_catalog_card_reuses_existing_records():
     provider_card = CatalogCardSearchResult(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -1098,7 +1073,7 @@ def test_import_catalog_card_reuses_existing_records():
 
 def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch):
     provider_card = CatalogCardSearchResult(
-        provider="pokemon_tcg",
+        provider="tcgdex",
         provider_card_id="base1-4",
         name="Charizard",
         set_id="base1",
@@ -1112,7 +1087,7 @@ def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch)
         ],
     )
 
-    def fake_get_pokemon_card(provider_card_id):
+    def fake_get_tcgdex_card(provider_card_id):
         assert provider_card_id == "base1-4"
         return provider_card
 
@@ -1120,8 +1095,8 @@ def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch)
     # response serialization, and PostgreSQL persistence still run normally.
     monkeypatch.setattr(
         catalog_router,
-        "get_pokemon_card",
-        fake_get_pokemon_card,
+        "get_tcgdex_card",
+        fake_get_tcgdex_card,
     )
 
     response = client.post(
