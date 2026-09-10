@@ -92,6 +92,38 @@ def search_tcgdex_cards(
             "TCGdex returned an invalid search response."
         ) from exc
 
+def build_variant_name(variant_data: dict) -> str:
+    """Build a readable name from the provider's variant details."""
+
+    parts = [variant_data["type"]]
+
+    if variant_data.get("subtype"):
+        parts.append(variant_data["subtype"])
+
+    # Stamps distinguish versions such as first-edition printings.
+    stamps = variant_data.get("stamp") or []
+    if not isinstance(stamps, list):
+        raise TypeError("Expected a list of variant stamps.")
+    parts.extend(stamps)
+
+    # Mention unusual sizes, but leave out the ordinary standard size.
+    size = variant_data.get("size")
+    if size and size != "standard":
+        parts.append(size)
+
+    labels = []
+    for part in parts:
+        if not isinstance(part, str):
+            raise TypeError("Expected variant description text.")
+
+        label = part.replace("-", " ").replace("_", " ").strip()
+        # Uppercase the first character without changing acronyms or "1st".
+        label = label[:1].upper() + label[1:]
+
+        if label and label not in labels:
+            labels.append(label)
+
+    return " · ".join(labels)
 
 def map_tcgdex_card(card_data: dict) -> CatalogCardSearchResult:
     # Reuse the basic fields we already map for search results.
@@ -136,6 +168,7 @@ def map_tcgdex_card(card_data: dict) -> CatalogCardSearchResult:
         variants.append(
             CatalogVariantSearchResult(
                 variant_key=variant_key,
+                variant_name=build_variant_name(variant_data),
                 market_price=market_price,
                 currency="USD",
             )

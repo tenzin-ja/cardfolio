@@ -76,6 +76,10 @@ def import_catalog_card(
                 )
 
                 db.add(snapshot)
+        # Update names for both new and previously imported variants.
+        # Missing provider names should not erase an existing name.
+        if provider_variant.variant_name:
+            variant.variant_name = provider_variant.variant_name
     db.commit()
     db.refresh(catalog_card)
 
