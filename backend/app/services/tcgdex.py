@@ -1,7 +1,6 @@
 import httpx
 from decimal import Decimal, InvalidOperation
 
-import httpx
 
 from app.schemas.catalog import (
     CatalogCardSearchResult,

@@ -3,7 +3,6 @@ import httpx
 from fastapi import APIRouter, Query, Depends, HTTPException, status
 from sqlalchemy.orm import Session 
 
-from app.config import ConfigurationError
 from app.db.database import get_db
 from app.services.catalog_import import import_catalog_card
 from app.schemas.catalog import ( 
@@ -11,10 +10,10 @@ from app.schemas.catalog import (
     CatalogImportResponse,
     CatalogImportRequest,
 )
-from app.services.pokemon_tcg import (
-    PokemonTCGResponseError,
-    search_pokemon_cards,
-    get_pokemon_card
+from app.services.tcgdex import (
+    TCGdexResponseError,
+    search_tcgdex_cards,
+    get_tcgdex_card,
 )
 router = APIRouter(
     prefix = "/catalog",
@@ -31,26 +30,22 @@ def search_catalog(
     page_size: int = Query(default = 20, ge = 1, le = 100)
 )-> CatalogSearchResponse:
     """
-    Search the Pokemon TCG catalog without exposing the provider api key
+    Search TCGdex and return Cardfolio's catalog summaries
     """
 
-    # the service reads the api key from the backend env, calls the     
-    # provider, and converts its response into cardfolio's catalog schema
+    # The service handles the provider request and response mapping
+    # This route validates inputs and turns failures into HTTP responses
 
     try:
 
-        return search_pokemon_cards(
-            query = query,
-            page = page,
-            page_size = page_size
+        return search_tcgdex_cards(
+            query=query,
+            page=page,
+            page_size=page_size,
         )
-    except ConfigurationError as exc:
-        raise HTTPException(
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = "The card catalog is not configured",
-        ) from exc
 
-    except PokemonTCGResponseError as exc:
+
+    except TCGdexResponseError as exc:
         #The provider replied but sent out unusable data
         raise HTTPException(
             status_code = status.HTTP_502_BAD_GATEWAY,
@@ -81,15 +76,9 @@ def import_catalog(
 ):
     '''Fetch a provider card and save it in the local catalog'''
     try: 
-        provider_card = get_pokemon_card(request.provider_card_id)
+        provider_card = get_tcgdex_card(request.provider_card_id)
 
-    except ConfigurationError as exc:
-        raise HTTPException(
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = "The card catalog is not configured",
-        ) from exc
-
-    except PokemonTCGResponseError as exc:
+    except TCGdexResponseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The card catalog provider returned an invalid response."
