@@ -6,8 +6,7 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import Session, joinedload
 
 
 from app.db.database import get_db
@@ -76,13 +75,18 @@ def get_collection_items(
 
     # Databases do not guarantee row order without an explicit sort.
     # Ordering by ID gives clients predictable results between requests.
-    return(
+    return (
         db.query(CollectionItem)
+        # Fetch each item's variant and card in the same database query.
+        # Otherwise, serializing the list can trigger extra queries per item.
+        .options(
+            joinedload(CollectionItem.card_variant)
+            .joinedload(CardVariant.catalog_card)
+        )
         .order_by(CollectionItem.id)
         .limit(limit)
         .all()
     )
-
 
 @router.patch(
     "/{item_id}",

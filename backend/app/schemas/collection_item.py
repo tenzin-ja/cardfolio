@@ -91,12 +91,40 @@ class CollectionItemUpdate(BaseModel):
 
         return value
 
+class CollectionCardResponse(BaseModel):
+    '''Card information needed to display an owned item'''
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    provider: str
+    provider_card_id: str
+    name: str
+    set_name: str
+    card_number: str
+    rarity: str | None
+    image_url: str| None
+
+class CollectionVariantResponse(BaseModel):
+    '''The owned version, its stored price, and its parent card'''
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int 
+    variant_key: str
+    market_price: Decimal | None
+    currency: str
+
+    #this matches teh relationship defined on teh cardvariant model
+    catalog_card: CollectionCardResponse
 
 #The response contains every creation field plus the database generated ID
 class CollectionItemResponse(CollectionItemCreate):
-    id: int
 
     # Allows the Pydantic to build this reponse by reading attributes from a 
     #SQLAlchemy CollectionItem object instead of requiring a dict
     model_config = ConfigDict(from_attributes = True)
+
+    id: int 
+
+    #pydantic reads this relationship and uses the nested response schema
+    card_variant: CollectionVariantResponse
 
