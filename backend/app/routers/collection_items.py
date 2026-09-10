@@ -73,12 +73,12 @@ def get_collection_items(
     Return saved collection items in a stable order.
     """
 
-    # Databases do not guarantee row order without an explicit sort.
-    # Ordering by ID gives clients predictable results between requests.
+    # Databases do not guarantee row order without an explicit sort
+    # Ordering by ID gives clients predictable results between requests
     return (
         db.query(CollectionItem)
-        # Fetch each item's variant and card in the same database query.
-        # Otherwise, serializing the list can trigger extra queries per item.
+        # Load the variant and card now so building the JSON response
+        # doesn't require extra database queries for each item
         .options(
             joinedload(CollectionItem.card_variant)
             .joinedload(CardVariant.catalog_card)

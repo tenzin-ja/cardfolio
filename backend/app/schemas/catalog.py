@@ -12,6 +12,8 @@ class CatalogVariantSearchResult(BaseModel):
     # TCGdex supplies its variantId here
     variant_key: str
 
+    variant_name: str | None = Field(default=None, max_length=200)
+
     # Prices are represented as Decimal to avoid floating-point rounding.
     market_price: Decimal | None = Field(default=None, ge=0)
 

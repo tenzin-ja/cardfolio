@@ -110,6 +110,7 @@ class CollectionVariantResponse(BaseModel):
 
     id: int 
     variant_key: str
+    variant_name: str | None = None
     market_price: Decimal | None
     currency: str
 
@@ -127,4 +128,3 @@ class CollectionItemResponse(CollectionItemCreate):
 
     #pydantic reads this relationship and uses the nested response schema
     card_variant: CollectionVariantResponse
-
