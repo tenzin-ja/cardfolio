@@ -12,6 +12,7 @@ from app.models.card_variant import CardVariant
 # import collection item model
 from app.models.collection_item import CollectionItem
 from app.models.price_snapshot import PriceSnapshot
+from app.models.user import User
 
 from logging.config import fileConfig
 
