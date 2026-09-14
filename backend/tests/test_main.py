@@ -2,6 +2,9 @@ import os
 import httpx
 import pytest
 
+from datetime import datetime, timedelta, timezone
+import jwt
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine,text
 from sqlalchemy.engine import make_url
@@ -1187,3 +1190,105 @@ def test_register_user_rejects_duplicate_email():
 
     with TestingSessionLocal() as db:
         assert db.query(User).count() == 1
+
+
+@pytest.fixture
+def auth_account(monkeypatch):
+    # Tests use their own signing key, never the secret in your local .env.
+    monkeypatch.setenv(
+        "JWT_SECRET_KEY",
+        "test-only-signing-key-not-for-production-123456",
+    )
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": "learner@example.com",
+            "password": "local-practice-passphrase",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def test_login_token_identifies_current_user(auth_account):
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": "LEARNER@example.com",
+            "password": "local-practice-passphrase",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"access_token", "token_type"}
+    assert body["token_type"] == "bearer"
+
+    # Use the actual login token to exercise signature checking and user lookup.
+    me_response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json() == auth_account
+
+
+@pytest.mark.parametrize(
+    "email,password",
+    [
+        ("learner@example.com", "incorrect-password"),
+        ("unknown@example.com", "local-practice-passphrase"),
+    ],
+)
+def test_login_rejects_invalid_credentials(auth_account, email, password):
+    response = client.post(
+        "/auth/login",
+        json={"email": email, "password": password},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Incorrect email or password."
+    }
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["missing", "malformed", "expired", "wrong_signature", "missing_expiry"],
+)
+def test_me_rejects_invalid_authentication(auth_account, case):
+    headers = {}
+
+    if case == "malformed":
+        headers["Authorization"] = "Bearer not-a-valid-token"
+
+    elif case != "missing":
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": str(auth_account["id"]),
+            "iat": now - timedelta(minutes=2),
+            "exp": now + timedelta(minutes=5),
+        }
+        signing_key = os.environ["JWT_SECRET_KEY"]
+
+        if case == "expired":
+            # Create an already-expired token; no waiting or sleeping needed.
+            payload["exp"] = now - timedelta(minutes=1)
+        elif case == "wrong_signature":
+            signing_key = "different-test-signing-key-1234567890123456"
+        elif case == "missing_expiry":
+            del payload["exp"]
+
+        token = jwt.encode(payload, signing_key, algorithm="HS256")
+        headers["Authorization"] = f"Bearer {token}"
+
+    response = client.get("/auth/me", headers=headers)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+    assert response.json() == {
+        "detail": "Invalid or expired authentication token."
+    }
