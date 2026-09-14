@@ -3,6 +3,7 @@ from psycopg.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user import (
@@ -104,3 +105,10 @@ def login_user(
         ) from exc
 
     return TokenResponse(access_token=access_token)
+
+@router.get("/me", response_model=UserResponse)
+def get_my_account(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the account identified by the validated access token."""
+    return current_user
