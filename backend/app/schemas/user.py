@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -34,3 +35,23 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     created_at: datetime
+
+class UserLogin(BaseModel):
+    '''Credentials submitted when signing in'''
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr = Field(max_length=320)
+    password: str = Field(min_length=1,max_length=128, repr=False)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_emails(cls,value: str)-> str:
+        # to keep the same format as registration
+        return value.lower()
+
+class TokenResponse(BaseModel):
+    access_token: str
+    # Access tokens are sent as Bearer tokens in the Authorization header
+    token_type: Literal["bearer"] = "bearer"
+
