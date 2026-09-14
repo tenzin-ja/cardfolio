@@ -5,9 +5,19 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.user import UserRegister, UserResponse
-from app.security import hash_password
-
+from app.schemas.user import (
+    TokenResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+)
+from app.security import (
+    DUMMY_PASSWORD_HASH,
+    create_access_token,
+    hash_password,
+    verify_password,
+)
+from app.config import ConfigurationError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -57,3 +67,40 @@ def register_user(
 
     # FastAPI uses UserResponse to keep the password hash out of the response
     return user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login_user(
+    credentials: UserLogin,
+    db: Session = Depends(get_db),
+):
+    """Verify credentials and issue a short-lived access token."""
+
+    user = (
+        db.query(User)
+        .filter(User.email == credentials.email)
+        .first()
+    )
+
+    stored_hash = (
+        user.password_hash if user is not None else DUMMY_PASSWORD_HASH
+    )
+    password_is_valid = verify_password(credentials.password, stored_hash)
+
+    # Don't reveal whether the email or password was incorrect.
+    if user is None or not password_is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        access_token = create_access_token(user.id)
+    except ConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication is not configured.",
+        ) from exc
+
+    return TokenResponse(access_token=access_token)

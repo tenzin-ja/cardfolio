@@ -11,6 +11,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 password_hasher = PasswordHash.recommended()
 
+# Check a hash even when the email isn't registered, so that failure path
+# doesn't skip the expensive password check and return noticeably faster
+DUMMY_PASSWORD_HASH = password_hasher.hash("unused-dummy-password")
 
 def hash_password(password: str) -> str:
     """Hash a password before it reaches database storage."""

@@ -51,6 +51,7 @@ class UserLogin(BaseModel):
         return value.lower()
 
 class TokenResponse(BaseModel):
+    '''Return the access token and its type after a successful login'''
     access_token: str
     # Access tokens are sent as Bearer tokens in the Authorization header
     token_type: Literal["bearer"] = "bearer"
