@@ -27,3 +27,16 @@ def get_database_url() -> str:
         )
 
     return database_url
+
+def get_jwt_secret_key() -> str:
+    """Read the secret used to sign and verify access tokens."""
+
+    secret = os.getenv("JWT_SECRET_KEY", "").strip()
+
+    if len(secret.encode("utf-8")) < 32:
+        raise ConfigurationError(
+            "JWT_SECRET_KEY must contain at least 32 bytes. "
+            "Generate a random key and configure it in backend/.env."
+        )
+
+    return secret
