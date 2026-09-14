@@ -9,8 +9,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 
+
 # Load backend/.env before reading TEST_DATABASE_URL.
 import app.config
+
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "").strip()
 
@@ -50,6 +52,9 @@ from app.schemas.catalog import(
     CatalogCardSearchResult,
     CatalogVariantSearchResult
 )
+from app.models.user import User
+from app.security import password_hasher
+
 # Use the dedicated PostgreSQL database validated above.
 test_engine = create_engine(TEST_DATABASE_URL)
 
@@ -1128,3 +1133,57 @@ def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch)
         assert saved_variant.catalog_card_id == saved_card.id
         assert snapshot.card_variant_id == saved_variant.id
         assert snapshot.market_price == Decimal("25.50")
+
+def test_register_user_saves_hash_and_returns_safe_response():
+    password = "local-practice-passphrase"
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": "Learner@example.com",
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["email"] == "learner@example.com"
+    assert set(body) == {"id", "email", "created_at"}
+
+    # Check the saved record, not just the HTTP response.
+    with TestingSessionLocal() as db:
+        user = db.query(User).one()
+
+        assert user.id == body["id"]
+        assert user.email == "learner@example.com"
+        assert user.password_hash != password
+        assert password_hasher.verify(password, user.password_hash)
+
+
+def test_register_user_rejects_duplicate_email():
+    first_response = client.post(
+        "/auth/register",
+        json={
+            "email": "Learner@example.com",
+            "password": "local-practice-passphrase",
+        },
+    )
+    assert first_response.status_code == 201
+
+    # Different capitalization must not create a second account.
+    duplicate_response = client.post(
+        "/auth/register",
+        json={
+            "email": "learner@example.com",
+            "password": "another-practice-passphrase",
+        },
+    )
+
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json() == {
+        "detail": "An account with this email already exists."
+    }
+
+    with TestingSessionLocal() as db:
+        assert db.query(User).count() == 1

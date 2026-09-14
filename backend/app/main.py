@@ -18,3 +18,6 @@ app.include_router(collection_items.router)
 
 #makes the external card catalog search avaliable to api clients
 app.include_router(catalog.router)
+
+#connect auth endpoints to app
+app.include_router(auth.router)
