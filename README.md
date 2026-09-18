@@ -1,37 +1,30 @@
 # Cardfolio
 
-Cardfolio is a trading card collection and portfolio tracker. The
-project is currently focused on building a reliable backend API for storing and
-managing card data before the frontend is added.
+Cardfolio is a Pokémon trading card collection and portfolio tracker. It brings
+together card discovery, variant information, purchase records, and market-price
+data to help collectors organize and understand their collections.
 
-## Current Status
+Its FastAPI backend integrates TCGdex card data with PostgreSQL storage and
+provides APIs for account registration, login, catalog imports, and collection
+management.
 
-As of September 18, 2026, the project is in backend development. The frontend
-has not been started.
+## Features
 
-- [x] PostgreSQL persistence with SQLAlchemy, Psycopg, and Alembic migrations
-- [x] Pokémon card search and single-card lookup through TCGdex
-- [x] Importing catalog cards and variants, with existing records reused on reimport
-- [x] Creating, listing, updating, and deleting collection items
-- [x] Collection responses with card name, set, image, readable variant name,
+- Pokémon card search and single-card lookup through TCGdex
+- Catalog imports that preserve card and variant identities across repeated imports
+- Collection management with condition, quantity, purchase information, and notes
+- Collection responses with card name, set, image, readable variant name,
   stored market price, and currency
-- [x] Initial price snapshots for newly imported variants with available prices
-- [x] User registration with normalized emails, Argon2 password hashing, and
+- Initial price snapshots for newly imported variants with available prices
+- User registration with normalized emails, Argon2 password hashing, and
   duplicate-email rejection
-- [x] Login with 30-minute JWT access tokens and authenticated `/auth/me`
-- [x] Tests for registration, login, invalid tokens, collection operations,
+- Login with 30-minute JWT access tokens and authenticated account lookup
+- PostgreSQL persistence with SQLAlchemy, Psycopg, and Alembic migrations
+- Automated tests for registration, login, invalid tokens, collection operations,
   provider mapping, and database behavior
-- [ ] Per-user collection ownership and access restrictions
 
-**Collection ownership is the next planned milestone and has not been
-implemented.** Collection items currently have no `user_id`, and collection,
-catalog, and legacy card routes do not require authentication. `/auth/me` is
-protected; signing in does not yet make collections private. The backend is
-not ready for public multi-user use.
-
-Market prices are stored values, not live valuations on every collection
-request. Reimporting can update variant names, but it does not refresh prices
-or add new price snapshots for existing variants. Missing prices remain `null`.
+Collection responses use stored market prices. Unavailable prices are represented
+as `null`, and reimporting a card can update its readable variant names.
 
 ## Tech Stack
 
@@ -53,7 +46,7 @@ cardfolio/
 │   ├── app/
 │   │   ├── db/          # Database connection and sessions
 │   │   ├── models/      # SQLAlchemy database models
-│   │   ├── routers/     # Auth, catalog, collection, and legacy card routes
+│   │   ├── routers/     # Auth, catalog, collection, and card routes
 │   │   ├── schemas/     # Pydantic request and response schemas
 │   │   ├── services/    # TCGdex integration and catalog import logic
 │   │   ├── config.py    # Environment-based configuration
@@ -80,15 +73,14 @@ cardfolio/
 | `GET` | `/collection-items` | List collection items with related card details and optional `limit` |
 | `PATCH` | `/collection-items/{item_id}` | Update condition, quantity, purchase information, or notes |
 | `DELETE` | `/collection-items/{item_id}` | Delete a collection item while preserving its catalog card and variant |
-| `POST` | `/cards` | Create a legacy standalone card record |
-| `GET` | `/cards` | List legacy cards with optional `name` and `limit` parameters |
-| `GET` | `/cards/{card_id}` | Retrieve one legacy card |
-| `PATCH` | `/cards/{card_id}` | Update a legacy card |
-| `DELETE` | `/cards/{card_id}` | Delete a legacy card |
+| `POST` | `/cards` | Create a standalone card record |
+| `GET` | `/cards` | List standalone cards with optional `name` and `limit` parameters |
+| `GET` | `/cards/{card_id}` | Retrieve one standalone card |
+| `PATCH` | `/cards/{card_id}` | Update a standalone card |
+| `DELETE` | `/cards/{card_id}` | Delete a standalone card |
 
-The `/cards` routes are the earlier standalone-card workflow. The catalog and
-collection routes are the workflow intended for the frontend; a decision about
-retiring or restricting `/cards` is still pending.
+The catalog and collection routes support the search-to-collection workflow.
+The `/cards` routes manage standalone card records separately.
 
 Catalog search returns lightweight summaries. Import a selected card to obtain
 its variants and their local database IDs. For example, send this body to
@@ -106,10 +98,9 @@ provider's card ID and opaque variant key. Collection responses nest variant
 information under `card_variant` and card details under
 `card_variant.catalog_card`.
 
-Collection listing currently returns up to 20 items by default, with a maximum
-`limit` of 100. It does not yet support requesting subsequent pages. Catalog
-search supports pages, but its `total_count` is `null` because the provider
-response does not supply a total.
+Collection listing returns up to 20 items by default, with a maximum `limit` of
+100. Catalog search accepts `page` and `page_size`; its `total_count` is `null`
+when the total number of matches is unknown.
 
 ## Running the Backend
 
@@ -224,10 +215,10 @@ To check authentication in Swagger:
    prefix.
 4. Execute `/auth/me` to retrieve the signed-in account.
 
-Tokens expire after 30 minutes. Refresh tokens and server-side logout/revocation
-are not implemented. Clearing authorization in Swagger only removes its local
-token. The collection routes still operate without user ownership, as described
-in Current Status.
+Tokens expire after 30 minutes; sign in again to obtain a new token. Clearing
+authorization in Swagger removes its local token. Bearer-token authentication
+is currently enforced on `/auth/me`; per-user collection access is part of the
+planned scope below.
 
 ## Running the Tests
 
@@ -251,25 +242,15 @@ Login/token tests supply a test-only signing key through environment overrides.
 
 The suite covers card and collection APIs, database constraints, price snapshots,
 catalog import/reimport behavior, provider mapping, registration, password-hash
-storage, login, and token rejection. Run the command above for the current test
-result; no fixed test count is maintained here.
+storage, login, and token rejection.
 
-## Roadmap
+## Planned Scope
 
-Before starting the frontend:
+The project scope extends to a web dashboard for browsing cards, managing
+personal collections, and exploring portfolio values. Planned additions include:
 
-1. Add per-user collection ownership: choose an owner for existing development
-   items, migrate the data, and require a valid user for each collection item.
-2. Require authentication for collection operations, assign ownership from the
-   signed-in user, and verify that users cannot read or modify each other's items.
-3. Add collection pagination and configure CORS for the frontend.
-4. Decide access rules for catalog search/import and retire or restrict the
-   legacy `/cards` endpoints.
-5. Verify the complete workflow and update setup documentation, then begin the
-   collection dashboard and frontend.
-
-Before public release: deployment with PostgreSQL, CI, security and operational
-checks, account recovery, and abuse protection.
-
-Deferred beyond the initial frontend: AI assistant/MCP integration, scheduled
-price refreshes, price-history charts, analytics, and additional card providers.
+- Per-user collection ownership and access controls
+- Paginated collection browsing and a collection dashboard
+- Scheduled price updates, price-history charts, and portfolio analytics
+- An AI assistant with MCP tools for catalog and collection queries
+- Cloud deployment and continuous integration
