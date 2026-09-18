@@ -33,6 +33,11 @@ class CollectionItem(Base):
     )
 
     id = Column(Integer, primary_key = True)
+
+    #Every owned card belongs to an account
+    #The API will set this from the authenticated user, not from request JSON
+    user_id = Column(Integer,ForeignKey("users.id", ondelete="CASCADE"),nullable=False,index=True)
+
     card_variant_id = Column(Integer, ForeignKey("card_variants.id"), index = True, nullable = False)
 
     condition = Column(String(30), nullable = False)
@@ -42,7 +47,5 @@ class CollectionItem(Base):
     purchase_date = Column(Date(), nullable = True)
     notes = Column(Text(), nullable = True)
 
-    card_variant = relationship(
-        "CardVariant",
-        back_populates="collection_items",
-    )
+    user = relationship("User", back_populates="collections_items")
+    card_variant = relationship("CardVariant",back_populates="collection_items")

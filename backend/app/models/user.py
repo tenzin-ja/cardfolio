@@ -1,4 +1,5 @@
 from sqlalchemy import Column, DateTime, Integer, String, UniqueConstraint, func
+from sqlalchemy.orm import relationship
 
 from app.db.database import Base
 
@@ -26,4 +27,11 @@ class User(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+    )
+
+    collection_items = relationship(
+        "CollectionItem",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
