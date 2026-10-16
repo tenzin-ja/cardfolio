@@ -47,5 +47,5 @@ class CollectionItem(Base):
     purchase_date = Column(Date(), nullable = True)
     notes = Column(Text(), nullable = True)
 
-    user = relationship("User", back_populates="collections_items")
+    user = relationship("User", back_populates="collection_items")
     card_variant = relationship("CardVariant",back_populates="collection_items")
