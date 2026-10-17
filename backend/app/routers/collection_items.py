@@ -17,6 +17,10 @@ from app.schemas.collection_item import(
     CollectionItemResponse,
     CollectionItemUpdate,
 )
+# Reuse the dependency that validates tokens and retrieves the account.
+from app.dependencies import get_current_user
+# The database model representing that account.
+from app.models.user import User
 
 # The prefix is automatically added to every route defined in this file.
 router = APIRouter(
@@ -30,7 +34,9 @@ router = APIRouter(
     status_code = status.HTTP_201_CREATED
 )
 def create_collection_item(
-    item: CollectionItemCreate, 
+    item: CollectionItemCreate,
+    # FastAPI calls get_current_user before executing this function.
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -39,7 +45,7 @@ def create_collection_item(
 
     #a postive ID can pass pydantic vadliation even if that ID does not
     #belong to a real CardVariant. Checking here gives the client a clear 
-    # 404 response isntead of exposing a database IntegreityError/
+    # 404 response instead of exposing a database Integrity error
     card_variant = db.get(CardVariant, item.card_variant_id)
 
     if card_variant is None:
@@ -48,9 +54,14 @@ def create_collection_item(
             detail = "Card variant not found"
         )
 
+
+    db_item = CollectionItem(
+    # Ownership comes from the authenticated account.
+    user_id=current_user.id,
     #model_dump() converts the pydantic schema into a dict
     # ** unpacks that dict into ColectionItem constructor arguements
-    db_item = CollectionItem(**item.model_dump())
+    **item.model_dump(),
+)
 
     db.add(db_item)
     db.commit()
@@ -65,9 +76,10 @@ def create_collection_item(
     response_model = list[CollectionItemResponse],
 )
 def get_collection_items(
-    #Prevent clients from requesting an unlimited number of records at once.
-    limit: int = Query(default = 20, ge = 1, le = 100),
-    db: Session = Depends(get_db)
+    limit: int = Query(default=20, ge=1, le=100),
+    # Identify the account making this GET request.
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Return saved collection items in a stable order.
