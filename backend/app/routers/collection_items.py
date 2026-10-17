@@ -89,8 +89,9 @@ def get_collection_items(
     # Ordering by ID gives clients predictable results between requests
     return (
         db.query(CollectionItem)
-        # Load the variant and card now so building the JSON response
-        # doesn't require extra database queries for each item
+        # Only select rows owned by the signed-in account.
+        .filter(CollectionItem.user_id == current_user.id)
+        # Include the related variant and card details in the response.
         .options(
             joinedload(CollectionItem.card_variant)
             .joinedload(CardVariant.catalog_card)
@@ -107,14 +108,23 @@ def get_collection_items(
 def update_collection_item(
     item_id: int,
     item: CollectionItemUpdate,
+    # Validate the token and retrieve the requesting account.
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Update only the collection-item fields supplied by the client.
     """
 
-    # Retrieve the existing database row before attempting any changes.
-    db_item = db.get(CollectionItem, item_id)
+    #Verifies that user owns card before returning
+    db_item = (
+    db.query(CollectionItem)
+    .filter(
+        CollectionItem.id == item_id,          # Match the requested item.
+        CollectionItem.user_id == current_user.id,  # Match its owner.
+    )
+    .first()  # Return one matching item, or None.
+)
 
     if db_item is None:
         raise HTTPException(
@@ -144,16 +154,25 @@ def update_collection_item(
     status_code = status.HTTP_204_NO_CONTENT
 )
 def delete_collection_item(
-    item_id:int,
-    db: Session = Depends(get_db)
+    item_id: int,
+    # Identify the account requesting the deletion.
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
 
     """
     Delete one owned collection item
     """
 
-    db_item = db.get(CollectionItem, item_id)
-
+    #Same thing, verify user and item match before deleting
+    db_item = (
+        db.query(CollectionItem)
+        .filter(
+            CollectionItem.id == item_id,  # Find the requested item.
+            CollectionItem.user_id == current_user.id,  # Require ownership.
+        )
+        .first()
+    )
     if db_item is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
