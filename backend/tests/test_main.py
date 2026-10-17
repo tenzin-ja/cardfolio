@@ -460,7 +460,7 @@ def test_card_variant_rejects_missing_catalog_card():
 
         db.rollback()    
 
-def test_collection_item_can_be_saved():
+def test_collection_item_can_be_saved(auth_account):
 
     first_card = CatalogCard(
         provider="tcgdex",
@@ -478,6 +478,7 @@ def test_collection_item_can_be_saved():
 
     collection_item = CollectionItem (
         card_variant = first_variant,
+        user_id = auth_account["id"],
         condition = "near_mint"
     )
     with TestingSessionLocal() as db:
@@ -488,10 +489,11 @@ def test_collection_item_can_be_saved():
             
             assert collection_item.id is not None
             assert collection_item.card_variant_id == first_variant.id
+            assert collection_item.user_id == auth_account["id"]
             assert collection_item.quantity == 1
             assert collection_item.purchase_currency == "USD"
 
-def test_collection_item_rejects_invalid_condition():
+def test_collection_item_rejects_invalid_condition(auth_account):
     first_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -509,18 +511,22 @@ def test_collection_item_rejects_invalid_condition():
 
     collection_item = CollectionItem (
         card_variant = first_variant,
+        user_id = auth_account["id"],
         condition = "perfect"
     )
 
     with TestingSessionLocal() as db:
         db.add(collection_item)
-        with pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError) as exc_info:
             db.commit()
 
         db.rollback()
+        # Verify this failed for the condition, rather than missing ownership.
+        assert exc_info.value.orig.diag.constraint_name == "ck_collection_items_condition_allowed"
 
 
-def test_create_collection_item_endpoint():
+@pytest.fixture
+def collection_variant_id():
     catalog_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -542,12 +548,16 @@ def test_create_collection_item_endpoint():
         #save the plain integer before the session closes. SQLAlehcmy objects 
         # may otherwise need their closed session to reload expired values
         variant_id = variant.id
-    
-        
+
+    return variant_id
+
+
+def test_create_collection_item_endpoint(auth_account, auth_headers, collection_variant_id):
     response = client.post(
         "/collection-items",
+        headers=auth_headers,
         json = {
-            "card_variant_id": variant_id,
+            "card_variant_id": collection_variant_id,
             "condition" : "near_mint",
         },
     )
@@ -557,13 +567,16 @@ def test_create_collection_item_endpoint():
     data = response.json()
 
     assert data["id"] is not None
-    assert data["card_variant_id"] == variant_id
+    assert data["card_variant_id"] == collection_variant_id
     assert data["condition"] == "near_mint"
     assert data["quantity"] == 1
     assert data["purchase_currency"] == "USD"
 
+    with TestingSessionLocal() as db:
+        assert db.get(CollectionItem, data["id"]).user_id == auth_account["id"]
 
-def test_get_collection_items_respects_limit_and_id_order():
+
+def test_get_collection_items_respects_limit_and_id_order(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -588,6 +601,7 @@ def test_get_collection_items_respects_limit_and_id_order():
     # Create two owned items through the real POST endpoint.
     first_response = client.post(
         "/collection-items",
+        headers=auth_headers,
         json={
             "card_variant_id": variant_id,
             "condition": "near_mint",
@@ -596,6 +610,7 @@ def test_get_collection_items_respects_limit_and_id_order():
 
     second_response = client.post(
         "/collection-items",
+        headers=auth_headers,
         json={
             "card_variant_id": variant_id,
             "condition": "damaged",
@@ -608,6 +623,7 @@ def test_get_collection_items_respects_limit_and_id_order():
     # Query parameters are supplied separately from a GET request body.
     response = client.get(
         "/collection-items",
+        headers=auth_headers,
         params={"limit": 1},
     )
 
@@ -622,7 +638,7 @@ def test_get_collection_items_respects_limit_and_id_order():
     assert data[0]["condition"] == "near_mint"
 
 
-def test_update_collection_item_changes_only_supplied_fields():
+def test_update_collection_item_changes_only_supplied_fields(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -649,6 +665,7 @@ def test_update_collection_item_changes_only_supplied_fields():
     # Create the collection item that will be updated.
     create_response = client.post(
         "/collection-items",
+        headers=auth_headers,
         json={
             "card_variant_id": variant_id,
             "condition": "near_mint",
@@ -663,6 +680,7 @@ def test_update_collection_item_changes_only_supplied_fields():
     # Send only quantity because PATCH should leave omitted fields unchanged.
     response = client.patch(
         f"/collection-items/{item_id}",
+        headers=auth_headers,
         json={
             "quantity": 3,
         },
@@ -679,7 +697,7 @@ def test_update_collection_item_changes_only_supplied_fields():
     assert data["condition"] == "near_mint"
     assert data["card_variant_id"] == variant_id
 
-def test_delete_collection_item_removes_item_but_preserves_variant():
+def test_delete_collection_item_removes_item_but_preserves_variant(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -704,6 +722,7 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
     # Create the owned item that will be deleted.
     create_response = client.post(
         "/collection-items",
+        headers=auth_headers,
         json={
             "card_variant_id": variant_id,
             "condition": "near_mint",
@@ -715,7 +734,8 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
     item_id = create_response.json()["id"]
 
     delete_response = client.delete(
-        f"/collection-items/{item_id}"
+        f"/collection-items/{item_id}",
+        headers=auth_headers,
     )
 
     assert delete_response.status_code == 204
@@ -729,6 +749,151 @@ def test_delete_collection_item_removes_item_but_preserves_variant():
 
         # The shared variant must remain for other collection items.
         assert db.get(CardVariant, variant_id) is not None
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PATCH", "DELETE"])
+@pytest.mark.parametrize("case", ["missing", "malformed", "expired"])
+def test_collection_routes_reject_invalid_authentication(
+    auth_account, auth_headers, collection_variant_id, method, case
+):
+    created = client.post(
+        "/collection-items",
+        headers=auth_headers,
+        json={"card_variant_id": collection_variant_id, "condition": "near_mint"},
+    )
+    assert created.status_code == 201
+    item_id = created.json()["id"]
+
+    headers = {}
+    if case == "malformed":
+        headers["Authorization"] = "Bearer not-a-valid-token"
+    elif case == "expired":
+        now = datetime.now(timezone.utc)
+        token = jwt.encode(
+            {
+                "sub": str(auth_account["id"]),
+                "iat": now - timedelta(minutes=2),
+                "exp": now - timedelta(minutes=1),
+            },
+            os.environ["JWT_SECRET_KEY"],
+            algorithm="HS256",
+        )
+        headers["Authorization"] = f"Bearer {token}"
+
+    path = "/collection-items"
+    payload = None
+    if method == "POST":
+        payload = {"card_variant_id": collection_variant_id, "condition": "near_mint"}
+    elif method in {"PATCH", "DELETE"}:
+        path = f"/collection-items/{item_id}"
+        if method == "PATCH":
+            payload = {"quantity": 99}
+
+    response = client.request(method, path, headers=headers, json=payload)
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    # Rejected creation, updates, and deletion must leave the data untouched.
+    with TestingSessionLocal() as db:
+        saved_items = db.query(CollectionItem).all()
+        assert len(saved_items) == 1
+        assert saved_items[0].id == item_id
+        assert saved_items[0].quantity == 1
+        assert saved_items[0].user_id == auth_account["id"]
+
+
+def test_collection_items_are_private_between_users(auth_headers, collection_variant_id):
+    registration = client.post(
+        "/auth/register",
+        json={"email": "other@example.com", "password": "another-practice-passphrase"},
+    )
+    assert registration.status_code == 201
+    login = client.post(
+        "/auth/login",
+        json={"email": "other@example.com", "password": "another-practice-passphrase"},
+    )
+    assert login.status_code == 200
+    other_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    payload = {"card_variant_id": collection_variant_id, "condition": "near_mint"}
+
+    first = client.post("/collection-items", headers=auth_headers, json=payload)
+    assert first.status_code == 201
+    first_id = first.json()["id"]
+
+    # A new account sees an empty collection even when another account has items.
+    empty = client.get("/collection-items", headers=other_headers)
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+    # Both accounts can own the same shared card variant as separate items.
+    second = client.post("/collection-items", headers=other_headers, json=payload)
+    assert second.status_code == 201
+    second_id = second.json()["id"]
+    assert first_id != second_id
+
+    for headers, own_id, foreign_id in (
+        (auth_headers, first_id, second_id),
+        (other_headers, second_id, first_id),
+    ):
+        listing = client.get("/collection-items", headers=headers, params={"limit": 1})
+        assert listing.status_code == 200
+        assert [item["id"] for item in listing.json()] == [own_id]
+
+        update = client.patch(
+            f"/collection-items/{foreign_id}", headers=headers, json={"quantity": 99}
+        )
+        assert update.status_code == 404
+        assert update.json() == {"detail": "Collection item not found"}
+
+        deletion = client.delete(f"/collection-items/{foreign_id}", headers=headers)
+        assert deletion.status_code == 404
+        assert deletion.json() == {"detail": "Collection item not found"}
+
+    with TestingSessionLocal() as db:
+        assert db.get(CollectionItem, first_id).quantity == 1
+        assert db.get(CollectionItem, second_id).quantity == 1
+
+    # Deleting one's own copy must preserve the other account's copy and its card.
+    deletion = client.delete(f"/collection-items/{first_id}", headers=auth_headers)
+    assert deletion.status_code == 204
+    remaining = client.get("/collection-items", headers=other_headers)
+    assert remaining.status_code == 200
+    assert [item["id"] for item in remaining.json()] == [second_id]
+    assert remaining.json()[0]["card_variant_id"] == collection_variant_id
+
+
+def test_collection_item_owner_cannot_be_set_or_changed_by_client(
+    auth_account, auth_headers, collection_variant_id
+):
+    registration = client.post(
+        "/auth/register",
+        json={"email": "other@example.com", "password": "another-practice-passphrase"},
+    )
+    assert registration.status_code == 201
+    other_user_id = registration.json()["id"]
+
+    created = client.post(
+        "/collection-items",
+        headers=auth_headers,
+        json={
+            "card_variant_id": collection_variant_id,
+            "condition": "near_mint",
+            "user_id": other_user_id,
+        },
+    )
+    # Extra creation fields are ignored; the authenticated account remains the owner.
+    assert created.status_code == 201
+    item_id = created.json()["id"]
+
+    transfer = client.patch(
+        f"/collection-items/{item_id}",
+        headers=auth_headers,
+        json={"user_id": other_user_id},
+    )
+    assert transfer.status_code == 422
+    with TestingSessionLocal() as db:
+        assert db.get(CollectionItem, item_id).user_id == auth_account["id"]
+        assert db.query(CollectionItem).filter_by(user_id=other_user_id).count() == 0
+
 
 def test_price_snapshot_can_be_saved():
     """Save a variant price observation and check what should be its auto defaults."""
@@ -978,8 +1143,8 @@ def test_catalog_search_returns_502_for_invalid_provider_response(monkeypatch):
         {"quantity": 2_147_483_648},
     ),
 ])
-def test_collection_item_rejects_quantity_overflow(method, path, payload):
-    response = client.request(method, path, json=payload)
+def test_collection_item_rejects_quantity_overflow(method, path, payload, auth_headers):
+    response = client.request(method, path, json=payload, headers=auth_headers)
 
     assert response.status_code == 422
     assert any(
@@ -1209,6 +1374,20 @@ def auth_account(monkeypatch):
     )
     assert response.status_code == 201
     return response.json()
+
+
+@pytest.fixture
+def auth_headers(auth_account):
+    """Use the real login route so collection tests exercise token validation."""
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": auth_account["email"],
+            "password": "local-practice-passphrase",
+        },
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 def test_login_token_identifies_current_user(auth_account):
