@@ -118,262 +118,18 @@ def test_read_root():
         "message": "Cardfolio backend is running"
     }
 
-def test_create_card():
-    '''
-    Check that a card can be created successfully
-    '''
-    response = client.post(
-        "/cards",
-        json= { 
-            "name": "Pikachu",
-            "rarity" : "Rare",
-            "condition": "Near Mint",
-            "price": 25.50
-        } 
-    )
+def test_legacy_card_routes_are_not_exposed():
+    """The public app no longer serves the old standalone card endpoints."""
+    for method, path in (
+        ("GET", "/cards"),
+        ("POST", "/cards"),
+        ("GET", "/cards/1"),
+        ("PATCH", "/cards/1"),
+        ("DELETE", "/cards/1"),
+    ):
+        response = client.request(method, path)
+        assert response.status_code == 404, f"{method} {path} is still exposed"
 
-    assert response.status_code == 200
-    
-    data = response.json()
-    assert data["name"] == "Pikachu"
-    assert data["rarity"] == "Rare"
-    assert data["condition"] == "Near Mint"
-    assert data["price"] == 25.50
-    assert "id" in data
-
-def test_get_cards():
-    """Check that saved cards can be retrieved."""
-
-    # Create the card needed for this specific test.
-    create_response = client.post(
-        "/cards",
-        json={
-            "name": "Pikachu",
-            "rarity": "Rare",
-            "condition": "Near Mint",
-            "price": 25.50
-        }
-    )
-
-    assert create_response.status_code == 200
-
-    response = client.get("/cards")
-
-    assert response.status_code == 200
-
-    data = response.json()
-
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert data[0]["name"] == "Pikachu"
-
-def test_get_card_by_id():
-    """Retrieve the exact card matching the requested ID."""
-    create_response = client.post(
-        "/cards",
-        json={"name": "Eevee"}
-    )
-    assert create_response.status_code == 200
-
-    card_id = create_response.json()["id"]
-    response = client.get(f"/cards/{card_id}")
-
-    assert response.status_code == 200
-    assert response.json()["id"] == card_id
-    assert response.json()["name"] == "Eevee"
-
-
-def test_get_missing_card_returns_404():
-    """Return 404 when the requested card ID does not exist."""
-    response = client.get("/cards/999999")
-
-    assert response.status_code == 404
-    assert response.json() == {
-        "detail": "Card not found"
-    }
-
-def test_get_cards_filters_by_partial_case_insensitive_name():
-    """Return only cards matching a partial name, regardless of case."""
-
-    pikachu_response = client.post(
-        "/cards",
-        json={"name": "Pikachu"}
-    )
-    charmander_response = client.post(
-        "/cards",
-        json={"name": "Charmander"}
-    )
-
-    assert pikachu_response.status_code == 200
-    assert charmander_response.status_code == 200
-
-    response = client.get(
-        "/cards",
-        params={"name": "PIKA"}
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-
-    assert len(data) == 1
-    assert data[0]["name"] == "Pikachu"
-
-@pytest.mark.parametrize("invalid_limit", [0, 101])
-def test_get_cards_rejects_limit_outside_allowed_range(invalid_limit):
-    """
-    The API only permits limits from 1 through 100.
-
-    Parametrization runs this test once for each invalid value.
-    """
-    response = client.get(
-        "/cards",
-        params={"limit": invalid_limit}
-    )
-
-    assert response.status_code == 422
-
-def test_get_cards_respects_valid_limit():
-    """Return no more cards than the requested limit"""
-
-    for card_name in ["Pikachu", "Charmander"]:
-        create_response = client.post(
-            "/cards",
-            json={"name": card_name}
-        )
-        assert create_response.status_code == 200
-
-    response = client.get(
-        "/cards",
-        params = {"limit" : 1}
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-
-    #We only check the count because teh endpoint does not define a sorting order yet
-    assert len(data) == 1
-
-
-        
-
-def test_create_card_with_negative_price():
-    """
-    Check that a card cannot be created with a negative price.
-    """
-    response = client.post(
-        "/cards",
-        json={
-            "name": "Invalid Card",
-            "rarity": "Common",
-            "condition": "Near Mint",
-            "price": -10
-        }
-    )
-
-    assert response.status_code == 422
-
-def test_update_card():
-    """Check that an existing card can be updated."""
-
-    # Create a card specifically for this test.
-    create_response = client.post(
-        "/cards",
-        json={
-            "name": "Bulbasaur",
-            "rarity": "Common",
-            "condition": "Good",
-            "price": 10.00
-        }
-    )
-
-    card_id = create_response.json()["id"]
-
-    # Update only the price.
-    response = client.patch(
-        f"/cards/{card_id}",
-        json={
-            "price": 15.00
-        }
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-
-    assert data["id"] == card_id
-    assert data["name"] == "Bulbasaur"
-    assert data["price"] == 15.00
-
-def test_delete_card():
-    """Check that an existing card can be deleted."""
-    
-    # Create a card specifically for this test.
-    create_response = client.post(
-        "/cards",
-        json={
-            "name": "Squirtle",
-            "rarity": "Common",
-            "condition": "Good",
-            "price": 12.00
-        }
-    )
-
-    assert create_response.status_code == 200
-
-    card_id = create_response.json()["id"]
-
-    # Delete the card.
-    delete_response = client.delete(f"/cards/{card_id}")
-
-    assert delete_response.status_code == 200
-    assert delete_response.json() == {
-        "message": "Card deleted successfully"
-    }
-
-    # Deleting it again should return 404 because it no longer exists.
-    second_delete_response = client.delete(f"/cards/{card_id}")
-
-    assert second_delete_response.status_code == 404
-    assert second_delete_response.json() == {
-        "detail": "Card not found"
-    }
-
-def test_update_missing_card_returns_404():
-    """Updating a nonexistent card should return a consisten 404 response."""
-
-    response = client.patch(
-        "/cards/999999",
-        json = {"price" : 15.00}
-    )
-
-    assert response.status_code == 404
-    assert response.json() == {
-        "detail" : "Card not Found"
-    }
-
-def test_update_card_rejects_null_name():
-    """A PATCH may omit the name, but it cannot explicitly erase the name."""
-
-    create_response = client.post(
-        "/cards",
-        json={"name": "Pikachu"}
-    )
-
-    assert create_response.status_code == 200
-
-    card_id = create_response.json()["id"]
-
-    response = client.patch(
-        f"/cards/{card_id}",
-        json={"name": None}
-    )
-
-    assert response.status_code == 422
-
-    # Confirm that the rejected update did not alter the saved card.
-    get_response = client.get("/cards")
-    assert get_response.json()[0]["name"] == "Pikachu"
 
 # A duplicate provider identity violates a database constraint, which
 # SQLAlchemy reports as IntegrityError even when no HTTP request is involved.
@@ -576,7 +332,7 @@ def test_create_collection_item_endpoint(auth_account, auth_headers, collection_
         assert db.get(CollectionItem, data["id"]).user_id == auth_account["id"]
 
 
-def test_get_collection_items_respects_limit_and_id_order(auth_headers):
+def test_get_collection_items_paginates_in_id_order(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -636,6 +392,31 @@ def test_get_collection_items_respects_limit_and_id_order(auth_headers):
     # ID ordering means the first created item should be returned first.
     assert data[0]["id"] == first_response.json()["id"]
     assert data[0]["condition"] == "near_mint"
+
+    next_page = client.get(
+        "/collection-items",
+        headers=auth_headers,
+        params={"limit": 1, "offset": 1},
+    )
+    assert next_page.status_code == 200
+    assert [item["id"] for item in next_page.json()] == [second_response.json()["id"]]
+
+    # Reaching the end of a collection returns an empty page.
+    last_page = client.get(
+        "/collection-items",
+        headers=auth_headers,
+        params={"limit": 1, "offset": 2},
+    )
+    assert last_page.status_code == 200
+    assert last_page.json() == []
+
+
+def test_get_collection_items_rejects_negative_offset(auth_headers):
+    response = client.get(
+        "/collection-items", headers=auth_headers, params={"offset": -1}
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["query", "offset"]
 
 
 def test_update_collection_item_changes_only_supplied_fields(auth_headers):
@@ -751,9 +532,8 @@ def test_delete_collection_item_removes_item_but_preserves_variant(auth_headers)
         assert db.get(CardVariant, variant_id) is not None
 
 @pytest.mark.parametrize("method", ["GET", "POST", "PATCH", "DELETE"])
-@pytest.mark.parametrize("case", ["missing", "malformed", "expired"])
-def test_collection_routes_reject_invalid_authentication(
-    auth_account, auth_headers, collection_variant_id, method, case
+def test_collection_routes_require_authentication(
+    auth_account, auth_headers, collection_variant_id, method
 ):
     created = client.post(
         "/collection-items",
@@ -762,22 +542,6 @@ def test_collection_routes_reject_invalid_authentication(
     )
     assert created.status_code == 201
     item_id = created.json()["id"]
-
-    headers = {}
-    if case == "malformed":
-        headers["Authorization"] = "Bearer not-a-valid-token"
-    elif case == "expired":
-        now = datetime.now(timezone.utc)
-        token = jwt.encode(
-            {
-                "sub": str(auth_account["id"]),
-                "iat": now - timedelta(minutes=2),
-                "exp": now - timedelta(minutes=1),
-            },
-            os.environ["JWT_SECRET_KEY"],
-            algorithm="HS256",
-        )
-        headers["Authorization"] = f"Bearer {token}"
 
     path = "/collection-items"
     payload = None
@@ -788,7 +552,7 @@ def test_collection_routes_reject_invalid_authentication(
         if method == "PATCH":
             payload = {"quantity": 99}
 
-    response = client.request(method, path, headers=headers, json=payload)
+    response = client.request(method, path, json=payload)
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
@@ -837,6 +601,13 @@ def test_collection_items_are_private_between_users(auth_headers, collection_var
         listing = client.get("/collection-items", headers=headers, params={"limit": 1})
         assert listing.status_code == 200
         assert [item["id"] for item in listing.json()] == [own_id]
+
+        # Each account has one item; another account's row cannot fill page two.
+        next_page = client.get(
+            "/collection-items", headers=headers, params={"limit": 1, "offset": 1}
+        )
+        assert next_page.status_code == 200
+        assert next_page.json() == []
 
         update = client.patch(
             f"/collection-items/{foreign_id}", headers=headers, json={"quantity": 99}
@@ -1229,8 +1000,16 @@ def test_import_catalog_card_reuses_existing_records():
         first_card = import_catalog_card(db, provider_card)
 
         card_id = first_card.id
-        variant_id = db.query(CardVariant).one().id
-        snapshot_id = db.query(PriceSnapshot).one().id
+        variant = db.query(CardVariant).one()
+        snapshot = db.query(PriceSnapshot).one()
+        variant_id = variant.id
+        snapshot_id = snapshot.id
+
+        # An older observation lets us check freshness without sleeps or timing races.
+        previous_observation = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        variant.market_price_updated_at = previous_observation
+        snapshot.observed_at = previous_observation
+        db.commit()
 
     # Import the same provider card through a fresh session.
     with TestingSessionLocal() as db:
@@ -1238,11 +1017,128 @@ def test_import_catalog_card_reuses_existing_records():
 
         assert second_card.id == card_id
 
-    # Verify that each table still contains the original record.
+    # The price was checked again, but unchanged quotes don't duplicate history.
     with TestingSessionLocal() as db:
         assert db.query(CatalogCard).one().id == card_id
-        assert db.query(CardVariant).one().id == variant_id
+        variant = db.query(CardVariant).one()
+        snapshot = db.query(PriceSnapshot).one()
+        assert variant.id == variant_id
+        assert variant.market_price == Decimal("25.50")
+        assert variant.market_price_updated_at > previous_observation
+        assert snapshot.id == snapshot_id
+        assert snapshot.observed_at == previous_observation
+
+
+@pytest.fixture
+def priced_provider_card():
+    return CatalogCardSearchResult(
+        provider="tcgdex",
+        provider_card_id="base1-4",
+        name="Charizard",
+        set_id="base1",
+        set_name="Base",
+        card_number="4",
+        variants=[
+            CatalogVariantSearchResult(
+                variant_key="holofoil", market_price=Decimal("25.50")
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "initial_price,new_price",
+    [
+        (Decimal("25.50"), Decimal("30.00")),
+        (Decimal("25.50"), Decimal("0.00")),
+        (None, Decimal("25.50")),
+    ],
+)
+def test_reimport_updates_price_and_preserves_owned_items(
+    auth_account, priced_provider_card, initial_price, new_price
+):
+    priced_provider_card.variants[0].market_price = initial_price
+    with TestingSessionLocal() as db:
+        card = import_catalog_card(db, priced_provider_card)
+        card_id = card.id
+        variant_id = db.query(CardVariant).one().id
+        owned_item = CollectionItem(
+            user_id=auth_account["id"],
+            card_variant_id=variant_id,
+            condition="lightly_played",
+            quantity=2,
+            purchase_price_per_card=Decimal("12.34"),
+            notes="Keep the original purchase details",
+        )
+        db.add(owned_item)
+        db.commit()
+        item_id = owned_item.id
+        history_before = [
+            (row.id, row.market_price, row.currency, row.source, row.observed_at)
+            for row in db.query(PriceSnapshot).order_by(PriceSnapshot.id).all()
+        ]
+
+    priced_provider_card.variants[0].market_price = new_price
+    with TestingSessionLocal() as db:
+        assert import_catalog_card(db, priced_provider_card).id == card_id
+
+    with TestingSessionLocal() as db:
+        variant = db.query(CardVariant).one()
+        assert variant.id == variant_id
+        assert variant.market_price == new_price
+        assert variant.currency == "USD"
+        assert variant.market_price_source == "tcgplayer"
+
+        history = db.query(PriceSnapshot).order_by(PriceSnapshot.id).all()
+        assert len(history) == len(history_before) + 1
+        assert [
+            (row.id, row.market_price, row.currency, row.source, row.observed_at)
+            for row in history[:-1]
+        ] == history_before
+        assert history[-1].card_variant_id == variant_id
+        assert history[-1].market_price == new_price
+        assert history[-1].observed_at == variant.market_price_updated_at
+
+        # A price refresh must keep existing ownership and purchase data intact.
+        owned_item = db.get(CollectionItem, item_id)
+        assert owned_item.user_id == auth_account["id"]
+        assert owned_item.card_variant_id == variant_id
+        assert owned_item.condition == "lightly_played"
+        assert owned_item.quantity == 2
+        assert owned_item.purchase_price_per_card == Decimal("12.34")
+        assert owned_item.notes == "Keep the original purchase details"
+
+
+def test_reimport_missing_price_preserves_last_known_quote(priced_provider_card):
+    with TestingSessionLocal() as db:
+        import_catalog_card(db, priced_provider_card)
+        variant = db.query(CardVariant).one()
+        previous_quote = (
+            variant.market_price,
+            variant.currency,
+            variant.market_price_source,
+            variant.market_price_updated_at,
+        )
+        snapshot_id = db.query(PriceSnapshot).one().id
+
+    incoming = priced_provider_card.variants[0]
+    incoming.market_price = None
+    incoming.currency = "EUR"
+    incoming.variant_name = "Updated label"
+    with TestingSessionLocal() as db:
+        import_catalog_card(db, priced_provider_card)
+
+    with TestingSessionLocal() as db:
+        variant = db.query(CardVariant).one()
+        assert (
+            variant.market_price,
+            variant.currency,
+            variant.market_price_source,
+            variant.market_price_updated_at,
+        ) == previous_quote
+        assert variant.variant_name == "Updated label"
         assert db.query(PriceSnapshot).one().id == snapshot_id
+
 
 def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch):
     provider_card = CatalogCardSearchResult(

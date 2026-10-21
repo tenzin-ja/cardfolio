@@ -77,6 +77,8 @@ def create_collection_item(
 )
 def get_collection_items(
     limit: int = Query(default=20, ge=1, le=100),
+    # This is for pagnation, setting a limit on how many cards will show at a time
+    offset: int = Query(default=0,ge=0),
     # Identify the account making this GET request.
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -97,6 +99,7 @@ def get_collection_items(
             .joinedload(CardVariant.catalog_card)
         )
         .order_by(CollectionItem.id)
+        .offset(offset)
         .limit(limit)
         .all()
     )

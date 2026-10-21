@@ -40,7 +40,8 @@ def import_catalog_card(
         # Flush assigns the card ID; the full import is committed below.
         db.flush()
 
-    # Match saved variants by key to keep the IDs that collection items use.
+
+    # Match saved variants by key so reimports reuse their existing IDs.
     variants_by_key = {
         variant.variant_key: variant
         for variant in catalog_card.variants
@@ -48,12 +49,12 @@ def import_catalog_card(
 
     # A card can have several variants, each with its own price.
     # Save or refresh each one using its provider key.
-    for provider_variant in provider_card_variants:
+    for provider_variant in provider_card.variants:
         variant = variants_by_key.get(provider_variant.variant_key)
 
-        #Create the variant only when it isn't already saved
-        if variant is None;
-        variant = CardVariant(
+        # Create the variant only when it isn't already saved.
+        if variant is None:
+            variant = CardVariant(
                 catalog_card=catalog_card,
                 variant_key=provider_variant.variant_key,
                 currency=provider_variant.currency,
