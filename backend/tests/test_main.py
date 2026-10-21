@@ -53,6 +53,7 @@ from app.services.tcgdex import TCGdexResponseError
 from app.services.catalog_import import import_catalog_card
 from app.schemas.catalog import(
     CatalogCardSearchResult,
+    CatalogSearchResponse,
     CatalogVariantSearchResult
 )
 from app.models.user import User
@@ -1140,7 +1141,7 @@ def test_reimport_missing_price_preserves_last_known_quote(priced_provider_card)
         assert db.query(PriceSnapshot).one().id == snapshot_id
 
 
-def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch):
+def test_catalog_search_import_and_add_to_collection(monkeypatch, auth_headers):
     provider_card = CatalogCardSearchResult(
         provider="tcgdex",
         provider_card_id="base1-4",
@@ -1156,21 +1157,44 @@ def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch)
         ],
     )
 
+    def fake_search_tcgdex_cards(query, page, page_size):
+        assert query == "Charizard"
+        return CatalogSearchResponse(
+            items=[{
+                "provider": provider_card.provider,
+                "provider_card_id": provider_card.provider_card_id,
+                "name": provider_card.name,
+                "card_number": provider_card.card_number,
+            }],
+            page=page,
+            page_size=page_size,
+            count=1,
+        )
+
     def fake_get_tcgdex_card(provider_card_id):
         assert provider_card_id == "base1-4"
         return provider_card
 
-    # Replace the provider lookup where the router uses it. The HTTP route,
-    # response serialization, and PostgreSQL persistence still run normally.
+    # Keep provider responses predictable while exercising the real API and database.
+    monkeypatch.setattr(
+        catalog_router,
+        "search_tcgdex_cards",
+        fake_search_tcgdex_cards,
+    )
     monkeypatch.setattr(
         catalog_router,
         "get_tcgdex_card",
         fake_get_tcgdex_card,
     )
 
+    search = client.get("/catalog/search", params={"query": "Charizard"})
+    assert search.status_code == 200
+    search_result = search.json()["items"][0]
+    assert search_result["name"] == "Charizard"
+
     response = client.post(
         "/catalog/import",
-        json={"provider_card_id": "base1-4"},
+        json={"provider_card_id": search_result["provider_card_id"]},
     )
 
     assert response.status_code == 200
@@ -1197,6 +1221,29 @@ def test_import_catalog_endpoint_saves_card_and_returns_variant_ids(monkeypatch)
         assert saved_variant.catalog_card_id == saved_card.id
         assert snapshot.card_variant_id == saved_variant.id
         assert snapshot.market_price == Decimal("25.50")
+
+    # Search supplies a provider ID; importing supplies the database variant ID
+    # that the add-card request needs.
+    added = client.post(
+        "/collection-items",
+        headers=auth_headers,
+        json={
+            "card_variant_id": returned_variant["id"],
+            "condition": "near_mint",
+            "quantity": 2,
+        },
+    )
+    assert added.status_code == 201
+
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    items = listing.json()
+    assert len(items) == 1
+    assert items[0]["id"] == added.json()["id"]
+    assert items[0]["quantity"] == 2
+    assert items[0]["card_variant_id"] == returned_variant["id"]
+    assert items[0]["card_variant"]["catalog_card"]["provider_card_id"] == search_result["provider_card_id"]
+    assert Decimal(items[0]["card_variant"]["market_price"]) == Decimal("25.50")
 
 def test_register_user_saves_hash_and_returns_safe_response():
     password = "local-practice-passphrase"
