@@ -1,0 +1,268 @@
+/* Light-theme defaults live on the shell and flow down to every component.
+   Change a color's role here instead of repeating hex values throughout the UI. */
+.app-shell {
+  --ground: #f7f8f8;
+  --sidebar: #eff1f1;
+  --surface: #ffffff;
+  --raised: #f0f2f1;
+  --active: #e0e5e2;
+  --text: #202322;
+  --muted: #626a66;
+  --border: #dde2df;
+  --control-border: #c3ccc6;
+  --primary: #242e29;
+  --on-primary: #ffffff;
+  --focus: #32654e;
+  --selection: #d8e9df;
+  --selected-edge: #748b7d;
+  --radius: 8px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* AppShell sets data-theme from its theme prop. Only the palette changes;
+   color-scheme also gives native browser controls the matching appearance. */
+.app-shell[data-theme='dark'] {
+  --ground: #111312;
+  --sidebar: #171a18;
+  --surface: #1a1d1b;
+  --raised: #222724;
+  --active: #2d3530;
+  --text: #ecf0ed;
+  --muted: #a4afa7;
+  --border: #2d3530;
+  --control-border: #4b5950;
+  --primary: #e4ece6;
+  --on-primary: #18221b;
+  --focus: #9fceb1;
+  --selection: #3c5445;
+  --selected-edge: #a0b5a7;
+  color-scheme: dark;
+}
+
+.icon { display: block; width: 19px; height: 19px; flex-shrink: 0; }
+/* Keep skip navigation offscreen until focused, then reveal it above the shell. */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--on-primary);
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* The sidebar becomes a compact header on smaller screens without a menu toggle. */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  padding: 34px 18px 22px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 9px; padding-inline: 10px; font-size: 1.5rem; font-weight: 650; letter-spacing: -0.04em; }
+.brand-mark { width: 30px; height: 30px; }
+.brand-period { color: var(--muted); }
+.primary-navigation { display: grid; gap: 6px; margin-top: 40px; }
+.nav-link {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 500;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+/* Use the accessible state attributes as the styling source of truth. */
+.nav-link[aria-current='page'] { color: var(--text); background: var(--active); }
+/* Push appearance and account details to the bottom when there is enough space. */
+.sidebar-footer { margin-top: auto; padding-top: 32px; }
+.theme-picker { padding: 0; margin: 0; border: 0; min-width: 0; }
+.theme-picker legend { margin-bottom: 10px; padding-left: 11px; color: var(--muted); font-size: 0.75rem; }
+/* Appearance and grid/list controls share the same segmented-button styling. */
+.segmented-control { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--raised); }
+.segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 13px;
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+.segment[aria-pressed='true'] { color: var(--text); background: var(--surface); border-color: var(--border); }
+.segment .icon { width: 16px; height: 16px; }
+.account-preview { display: flex; gap: 10px; align-items: center; margin-top: 22px; padding: 22px 8px 0; border-top: 1px solid var(--border); }
+.account-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--active); color: var(--muted); }
+.account-avatar .icon { width: 17px; height: 17px; }
+.account-name { font-weight: 500; font-size: 0.8125rem; }
+.account-caption { color: var(--muted); font-size: 0.75rem; margin-top: 1px; }
+
+/* Allow content to shrink within the grid, with a width cap on large monitors. */
+.main-content { min-width: 0; width: 100%; max-width: 1616px; margin-inline: auto; padding: 37px 40px 32px; }
+.page-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
+.page-heading { min-width: 0; }
+.page-heading h1 { font-size: 2rem; font-weight: 650; line-height: 1.2; letter-spacing: -0.035em; }
+.page-description { margin-top: 9px; color: var(--muted); }
+.page-description p { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.page-description span { margin-inline: 5px; }
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border: 1px solid transparent; border-radius: var(--radius); font-weight: 550; transition: background-color 160ms var(--ease), transform 160ms var(--ease); }
+.button-primary { background: var(--primary); color: var(--on-primary); }
+/* Keep inactive preview controls readable while distinguishing them from actions. */
+.button:disabled { background: var(--raised); color: var(--muted); border-color: var(--control-border); }
+.button:active:not(:disabled) { transform: scale(0.97); }
+.page-description .sample-label { font-size: 0.75rem; color: var(--text); padding: 2px 7px; margin-left: 8px; border-radius: 4px; background: var(--active); }
+.view-picker { width: fit-content; }
+.view-picker .segment { min-width: 70px; }
+
+/* This body is a disposable visual preview; the shell also accepts real pages. */
+.collection-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 32px; margin-top: 34px; }
+.collection-gallery { min-width: 0; }
+.card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 20px; }
+.card-artwork { position: relative; width: 100%; max-width: 218px; margin-inline: auto; padding: 9px; border: 1px solid transparent; border-radius: 12px; }
+.card-artwork-selected { border-color: var(--selected-edge); background: var(--surface); }
+/* Reserve portrait space while images load and preserve the complete card artwork. */
+.card-artwork img { width: 100%; aspect-ratio: 600 / 825; object-fit: contain; border-radius: 7px; }
+.selected-mark { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 24px; height: 24px; border: 3px solid var(--ground); border-radius: 50%; background: var(--primary); color: var(--on-primary); }
+.selected-mark .icon { width: 13px; height: 13px; stroke-width: 2; }
+.card-caption { padding: 12px 3px 0; }
+.card-caption h2 { font-size: 1rem; font-weight: 650; line-height: 1.35; letter-spacing: -0.015em; }
+.card-set { color: var(--muted); font-size: 0.75rem; margin-top: 3px; }
+.card-set span { margin-inline: 2px; }
+.card-facts { display: grid; gap: 4px; margin-top: 12px; font-size: 0.8125rem; }
+/* Align each label with its value; right-aligned amounts use the shell's tabular digits. */
+.card-facts > div, .detail-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+dt { color: var(--muted); }
+dd { text-align: right; overflow-wrap: anywhere; }
+.card-facts dt { flex-shrink: 0; }
+.card-price { padding-top: 6px; margin-top: 3px; }
+.card-price dd { font-weight: 600; }
+.preview-note { margin-top: 30px; border-top: 1px solid var(--border); padding-top: 16px; color: var(--muted); font-size: 0.75rem; }
+/* The detail panel sits alongside the gallery on desktop and below it on smaller screens. */
+.card-detail { padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.detail-label { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.75rem; color: var(--muted); margin-bottom: 20px; }
+.detail-indicator { padding: 2px 7px; background: var(--raised); border-radius: 4px; }
+.detail-artwork { padding-inline: 8px; }
+.detail-artwork img { width: 100%; aspect-ratio: 600 / 825; object-fit: contain; border-radius: 8px; }
+.detail-copy { padding-top: 22px; }
+.detail-copy h2 { font-size: 1.5rem; line-height: 1.3; font-weight: 650; letter-spacing: -0.03em; }
+.detail-set { margin-top: 5px; color: var(--muted); }
+.detail-set span { margin-inline: 4px; }
+.detail-variant { color: var(--muted); font-size: 0.8125rem; margin-top: 4px; }
+.detail-facts { display: grid; gap: 14px; border-top: 1px solid var(--border); margin-top: 20px; padding-top: 20px; font-size: 0.8125rem; }
+.detail-facts dd { font-weight: 500; }
+.currency { font-size: 0.6875rem; margin-left: 3px; }
+.price-note { font-size: 0.75rem; color: var(--muted); line-height: 1.6; padding-top: 18px; margin-top: 20px; border-top: 1px solid var(--border); }
+
+/* Touchscreens can retain hover styles after a tap, so limit these to mouse-like pointers. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-link:hover:not(:disabled), .segment:hover:not(:disabled) { background: var(--active); color: var(--text); }
+  .button-primary:hover:not(:disabled) { background: var(--text); }
+}
+
+/* Give the artwork and detail panel more breathing room on wide screens. */
+@media (min-width: 1600px) {
+  .collection-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; }
+  .card-grid { gap: 32px 28px; }
+}
+
+/* Reduce gallery columns before card images and metadata become cramped. */
+@media (max-width: 1250px) {
+  .app-shell { grid-template-columns: 200px minmax(0, 1fr); }
+  .sidebar { padding-inline: 12px; }
+  .main-content { padding-inline: 28px; }
+  .collection-layout { grid-template-columns: minmax(0, 1fr) 268px; gap: 24px; }
+  .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-detail { padding: 18px; }
+}
+
+/* Move navigation above the content; keep the theme control in the same header. */
+@media (max-width: 1000px) {
+  .app-shell { display: block; }
+  .sidebar { position: static; height: auto; min-height: 0; display: grid; grid-template-columns: 1fr auto; gap: 22px 24px; padding: 20px 28px 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .brand { padding: 0; font-size: 1.375rem; }
+  .primary-navigation { display: flex; grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  .nav-link { width: auto; padding-inline: 16px; }
+  .sidebar-footer { display: contents; }
+  .theme-picker { grid-column: 2; grid-row: 1; }
+  .theme-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .account-preview { display: none; }
+  .main-content { padding-top: 28px; }
+  .collection-layout { grid-template-columns: minmax(0, 1fr) 268px; gap: 24px; }
+  .segment { min-height: 40px; }
+}
+
+/* Stack the detail panel below the gallery, using a horizontal panel on tablets. */
+@media (max-width: 800px) {
+  .collection-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; }
+  .card-detail { display: grid; grid-template-columns: 190px minmax(0, 1fr); column-gap: 28px; padding: 24px; }
+  .detail-label { grid-column: 1 / -1; }
+  .detail-artwork { padding: 0; }
+  .detail-copy { padding-top: 0; }
+}
+
+/* On phones, use two card columns and larger touch targets. Theme text remains
+   available to screen readers when only its sun/moon icon is shown visually. */
+@media (max-width: 600px) {
+  .sidebar { padding: 18px 16px 12px; gap: 18px 12px; }
+  .brand { gap: 6px; font-size: 1.25rem; }
+  .brand-mark { width: 26px; height: 26px; }
+  .theme-picker .segment { padding: 6px 10px; min-width: 44px; min-height: 44px; }
+  .theme-picker .segment span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .primary-navigation { gap: 6px; }
+  .nav-link { flex: 1; justify-content: center; padding: 10px; }
+  .main-content { padding: 26px 16px 24px; }
+  .page-header { gap: 18px; align-items: flex-start; }
+  .page-heading, .page-actions { width: 100%; }
+  .page-actions { justify-content: space-between; }
+  .page-heading h1 { font-size: 1.5rem; }
+  .page-description { margin-top: 7px; font-size: 0.8125rem; }
+  .button { min-height: 44px; padding-inline: 12px; font-size: 0.8125rem; }
+  .button .icon { width: 16px; height: 16px; }
+  .collection-layout { margin-top: 24px; }
+  .page-description .sample-label { margin-left: 0; }
+  .segment { min-height: 44px; }
+  .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 14px; }
+  .card-artwork { padding: 6px; border-radius: 10px; }
+  .card-caption { padding-inline: 1px; }
+  .card-caption h2 { font-size: 0.9375rem; }
+  .card-facts > div { flex-wrap: wrap; gap: 0 6px; }
+  .card-facts dd { margin-left: auto; }
+  .card-detail { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 20px; }
+  .detail-artwork { max-width: 230px; margin-inline: auto; width: 100%; }
+  .detail-copy { padding-top: 24px; }
+}
+
+/* Short desktop windows scroll the sidebar rather than clipping its controls. */
+@media (min-width: 1001px) and (max-height: 600px) {
+  .sidebar { overflow-y: auto; min-height: 0; }
+}

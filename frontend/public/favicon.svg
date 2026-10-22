@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- A simplified stacked-card mark stays recognizable at browser-tab size. -->
+  <rect width="32" height="32" rx="8" fill="#242e29"/>
+  <g stroke="#ecf0ed" stroke-width="1.8" stroke-linejoin="round">
+    <path d="m11 8-5 1.2 3.6 16L13 24"/>
+    <rect x="12" y="7" width="12" height="18" rx="2"/>
+  </g>
+</svg>
