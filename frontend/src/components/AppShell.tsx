@@ -7,7 +7,8 @@ export type AppPage = 'collection' | 'search'
 type AppShellProps = {
   children: ReactNode
   theme: Theme
-  activePage: AppPage
+  // Unknown routes can display without highlighting a navigation item.
+  activePage: AppPage | null
   // The parent owns state and routing; the shell reports which option was clicked.
   onThemeChange?: (theme: Theme) => void
   onNavigate?: (page: AppPage) => void
