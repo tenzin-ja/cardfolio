@@ -1,5 +1,6 @@
 import { AppShell } from './components/AppShell'
 import { CollectionPreview } from './components/CollectionPreview'
+import { LoginPage } from './pages/LoginPage'
 import './App.css'
 
 // helps us update the value of Theme, and rerender the component if a switch occurs
@@ -59,6 +60,9 @@ function App() {
         path="/search"
         element={<PageHeader title="Find cards" />}
       />
+
+      {/* Preview the login UI; its request handler will be connected separately. */}
+      <Route path="/login" element={<LoginPage />} />
 
       {/* Give unknown URLs a clear result instead of an empty content area. */}
       <Route
