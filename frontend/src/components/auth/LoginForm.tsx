@@ -33,7 +33,7 @@ export function LoginForm({
   }
 
   return (
-    <div className="login-form">
+    <div className="auth-form">
       <header className="auth-heading">
         <h1>Welcome back</h1>
         <p>Log in to your Cardfolio account.</p>
@@ -103,7 +103,7 @@ export function LoginForm({
           type="button"
           onClick={onCreateAccount}
           disabled={!onCreateAccount || isSubmitting}
-          title={!onCreateAccount ? 'Sign-up UI is coming next' : undefined}
+          title={!onCreateAccount ? 'Account navigation is unavailable' : undefined}
         >
           Create an account
         </button>

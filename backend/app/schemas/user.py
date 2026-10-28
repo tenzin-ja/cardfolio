@@ -15,7 +15,7 @@ class UserRegister(BaseModel):
 
     # repr=False hides the password when printing this object
     # This does not hash it or hide it when using model_dump()
-    password: str = Field(min_length=15, max_length=128, repr=False)
+    password: str = Field(min_length=8, max_length=128, repr=False)
 
     @field_validator("email")
     @classmethod

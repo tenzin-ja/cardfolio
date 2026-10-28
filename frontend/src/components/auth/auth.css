@@ -96,7 +96,7 @@
   padding: 48px 40px;
 }
 
-.login-form {
+.auth-form {
   width: 100%;
   max-width: 360px;
 }
@@ -115,8 +115,15 @@
   line-height: 1.6;
 }
 
-.login-form form {
+.auth-form form {
   margin-top: 32px;
+}
+
+/* Both forms share field spacing and controls; only registration adds a password hint. */
+.auth-field-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
 }
 
 /* Explicit labels and browser autocomplete support keyboard users and password managers. */
@@ -176,14 +183,14 @@
   cursor: wait;
 }
 
-.login-form .auth-submit {
+.auth-form .auth-submit {
   width: 100%;
   min-height: 48px;
   margin-top: 28px;
 }
 
 /* A disabled preview button still reads as the primary action; the note explains availability. */
-.login-form .auth-submit:disabled {
+.auth-form .auth-submit:disabled {
   background: var(--primary);
   color: var(--on-primary);
   border-color: transparent;
@@ -202,6 +209,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 4px;
   margin-top: 28px;
   font-size: 0.8125rem;
@@ -209,6 +217,9 @@
 }
 
 .auth-text-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 0;
   border: 0;
   background: transparent;

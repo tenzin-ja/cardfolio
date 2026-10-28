@@ -8,7 +8,7 @@ type AuthLayoutProps = {
   children: ReactNode
 }
 
-// The same frame can hold login now and registration in the next UI step.
+// Login and registration share the same artwork, spacing, and responsive frame.
 // Colors come from AppShell, so the layout follows the existing theme preference.
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
