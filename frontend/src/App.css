@@ -119,11 +119,33 @@
 }
 .segment[aria-pressed='true'] { color: var(--text); background: var(--surface); border-color: var(--border); }
 .segment .icon { width: 16px; height: 16px; }
-.account-preview { display: flex; gap: 10px; align-items: center; margin-top: 22px; padding: 22px 8px 0; border-top: 1px solid var(--border); }
-.account-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--active); color: var(--muted); }
+/* Group identity and logout beneath Appearance. Long emails wrap inside the
+   sidebar instead of widening the page or covering the adjacent content. */
+.sidebar-account { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0; }
+.account-summary { display: flex; gap: 10px; align-items: center; padding-inline: 8px; min-width: 0; }
+.account-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: var(--active); color: var(--muted); }
 .account-avatar .icon { width: 17px; height: 17px; }
-.account-name { font-weight: 500; font-size: 0.8125rem; }
-.account-caption { color: var(--muted); font-size: 0.75rem; margin-top: 1px; }
+.account-copy { min-width: 0; }
+.account-name { font-weight: 500; font-size: 0.875rem; }
+.account-caption { color: var(--muted); font-size: 0.8125rem; margin-top: 2px; overflow-wrap: anywhere; }
+.account-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+.account-logout .icon { width: 18px; height: 18px; }
+.account-logout:disabled { color: var(--muted); opacity: 0.65; }
+.account-logout:active:not(:disabled) { background: var(--active); }
 
 /* Allow content to shrink within the grid, with a width cap on large monitors. */
 .main-content { min-width: 0; width: 100%; max-width: 1616px; margin-inline: auto; padding: 37px 40px 32px; }
@@ -184,7 +206,7 @@ dd { text-align: right; overflow-wrap: anywhere; }
 
 /* Touchscreens can retain hover styles after a tap, so limit these to mouse-like pointers. */
 @media (hover: hover) and (pointer: fine) {
-  .nav-link:hover:not(:disabled), .segment:hover:not(:disabled) { background: var(--active); color: var(--text); }
+  .nav-link:hover:not(:disabled), .segment:hover:not(:disabled), .account-logout:hover:not(:disabled) { background: var(--active); color: var(--text); }
   .button-primary:hover:not(:disabled) { background: var(--text); }
 }
 
@@ -214,7 +236,10 @@ dd { text-align: right; overflow-wrap: anywhere; }
   .sidebar-footer { display: contents; }
   .theme-picker { grid-column: 2; grid-row: 1; }
   .theme-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .account-preview { display: none; }
+  /* Keep account details and logout available when the sidebar becomes a header. */
+  .sidebar-account { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 16px; margin: 0; padding-top: 14px; }
+  .account-summary { flex: 1; padding: 0; }
+  .account-logout { flex-shrink: 0; width: auto; margin: 0; }
   .main-content { padding-top: 28px; }
   .collection-layout { grid-template-columns: minmax(0, 1fr) 268px; gap: 24px; }
   .segment { min-height: 40px; }
