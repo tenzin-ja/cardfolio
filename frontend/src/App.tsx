@@ -4,13 +4,14 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import './App.css'
 
+
 // helps us update the value of Theme, and rerender the component if a switch occurs
 import { useState, useEffect } from 'react'
 
 //imports from appshell. defs used to check on whether values are valid
 import type { Theme, AppPage } from './components/AppShell'
 
-import {Routes,Route, useLocation, useNavigate} from 'react-router'
+import {Navigate, Routes, Route, useLocation, useNavigate} from 'react-router'
 import {PageHeader} from './components/PageHeader'
 
 function App() {
@@ -39,6 +40,8 @@ function App() {
     const savedTheme = localStorage.getItem('cardfolio-theme')
     return savedTheme === 'dark' ? 'dark' : 'light'
   })
+  // Keep the token here so changing pages doesn't discard the session.
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   // Save the current preference whenever the theme changes.
   useEffect(() => {
     localStorage.setItem('cardfolio-theme', theme)
@@ -53,24 +56,42 @@ function App() {
     onNavigate={handleNavigate}
   >
       <Routes>
-      {/* The root URL displays the collection preview. */}
-      <Route path="/" element={<CollectionPreview />} />
+        {/* Require a session before displaying collection or search pages. */}
+        <Route
+          path="/"
+          element={
+            accessToken                           // Check whether a token exists.
+              ? <CollectionPreview />             // If yes, show this component.
+              : <Navigate to="/login" replace />  // Otherwise, redirect to login.
+          }
+        />
 
-      {/* Establish the search route before building its full interface. */}
-      <Route
-        path="/search"
-        element={<PageHeader title="Find cards" />}
-      />
+        <Route
+          path="/search"
+          element={
+            accessToken
+              ? <PageHeader title="Find cards" />
+              : <Navigate to="/login" replace />
+          }
+        />
 
-      {/* Authentication screens share a layout; request handlers are connected separately. */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+        <Route 
+          path="/register"
+          element = {<RegisterPage />}  
+        />
 
-      {/* Give unknown URLs a clear result instead of an empty content area. */}
-      <Route
-        path="*"
-        element={<PageHeader title="Page not found" />}
-      />
+        {/* Successful login passes its token into App's state setter. */}
+        <Route
+          path="/login"
+          element={<LoginPage onLogin={setAccessToken} />}
+        />
+        
+        {/* Show a message when the URL doesn't match an existing route. */}
+        <Route
+          path="*"
+          element={<PageHeader title="Page not found" />}
+        />
+
     </Routes>
     </AppShell>
   )
