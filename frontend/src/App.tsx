@@ -13,6 +13,8 @@ import type { Theme, AppPage } from './components/AppShell'
 
 import {Navigate, Routes, Route, useLocation, useNavigate} from 'react-router'
 import {PageHeader} from './components/PageHeader'
+import { getCurrentUser } from './api/auth'
+import type { CurrentUser } from './api/auth'
 
 function App() {
   
@@ -42,10 +44,74 @@ function App() {
   })
   // Keep the token here so changing pages doesn't discard the session.
   const [accessToken, setAccessToken] = useState<string | null>(null)
-  // Save the current preference whenever the theme changes.
+  
+  // Store the account separately from the token used to authenticate requests.
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+
+  // These values control the sidebar's loading and error feedback.
+  const [isAccountLoading, setIsAccountLoading] = useState(false)
+  const [accountError, setAccountError] = useState<string | null>(null)
+
   useEffect(() => {
     localStorage.setItem('cardfolio-theme', theme)
   }, [theme])
+  
+  // Load account details after login supplies a token.
+  useEffect(() => {
+    if (!accessToken) return
+
+    // Ignore a pending response if the token changes or App unmounts.
+    let ignore = false
+
+    async function loadAccount(token: string) {
+      setIsAccountLoading(true)
+      setAccountError(null)
+      setCurrentUser(null)
+
+      try {
+        const user = await getCurrentUser(token)
+
+        if (ignore) return
+
+        // A rejected token ends the session. Existing route guards
+        // will send the user back to login on protected pages.
+        if (user === null) {
+          setAccessToken(null)
+          return
+        }
+
+        setCurrentUser(user)
+      } catch (error) {
+        if (ignore) return
+
+        setAccountError(
+          error instanceof Error
+            ? error.message
+            : 'Could not load your account. Please try again.',
+        )
+      } finally {
+        if (!ignore) {
+          setIsAccountLoading(false)
+        }
+      }
+    }
+
+    void loadAccount(accessToken)
+
+    return () => {
+      ignore = true
+    }
+  }, [accessToken])
+
+  // Clear the current session and account feedback before returning to login.
+  function handleLogout() {
+    setAccessToken(null)
+    setCurrentUser(null)
+    setAccountError(null)
+    setIsAccountLoading(false)
+
+    navigate('/login', { replace: true })
+  }
 
 
   return (
@@ -54,6 +120,11 @@ function App() {
     activePage={activePage}
     onThemeChange={setTheme}
     onNavigate={handleNavigate}
+    isAuthenticated={Boolean(accessToken)}
+    accountEmail={currentUser?.email}
+    isAccountLoading={isAccountLoading}
+    accountError={accountError}
+    onLogout={handleLogout}
   >
       <Routes>
         {/* Require a session before displaying collection or search pages. */}
