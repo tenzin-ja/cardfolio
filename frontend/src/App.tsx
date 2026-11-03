@@ -2,6 +2,7 @@ import { AppShell } from './components/AppShell'
 import { CollectionPreview } from './components/CollectionPreview'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { SearchPage } from './pages/SearchPage'
 import './App.css'
 
 
@@ -141,7 +142,7 @@ function App() {
           path="/search"
           element={
             accessToken
-              ? <PageHeader title="Find cards" />
+              ? <SearchPage />
               : <Navigate to="/login" replace />
           }
         />

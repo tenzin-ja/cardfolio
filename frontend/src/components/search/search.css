@@ -1,0 +1,108 @@
+/* Search uses the shell's theme tokens. Keep these rules local so collection
+   and authentication layouts don't change when the catalog is refined. */
+.catalog-search-form {
+  margin-top: 30px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.catalog-search-fields { display: flex; align-items: flex-end; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.catalog-search-field { flex: 1; min-width: 0; }
+.catalog-search-field label { display: block; margin-bottom: 9px; font-weight: 500; }
+.catalog-search-input { position: relative; }
+.catalog-search-input > .icon { position: absolute; left: 14px; top: 15px; width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
+.catalog-search-input input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 11px 14px 11px 43px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--focus);
+  font-size: 1rem;
+  transition: border-color 160ms var(--ease);
+}
+.catalog-search-input input::placeholder { color: var(--muted); opacity: 1; }
+.catalog-search-input input:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.catalog-search-input input:disabled { background: var(--raised); color: var(--muted); }
+.catalog-search-form .catalog-search-submit { min-height: 48px; min-width: 110px; }
+.catalog-search-hint, .catalog-search-unavailable { margin-top: 10px; font-size: 0.8125rem; color: var(--muted); }
+.catalog-search-unavailable { color: var(--text); }
+
+/* Four columns fit the wide canvas; smaller viewports keep readable artwork
+   and two columns on phones. Each item's copy and action share the same edges. */
+.catalog-results { margin-top: 36px; }
+.catalog-section-heading, .catalog-start h2, .catalog-feedback h2 { font-size: 1.25rem; font-weight: 600; line-height: 1.35; letter-spacing: -0.02em; }
+.catalog-results-heading { margin-bottom: 24px; }
+.catalog-results-heading p { margin-top: 6px; color: var(--muted); overflow-wrap: anywhere; }
+.catalog-results-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 30px 24px; }
+.catalog-results-grid > li { min-width: 0; }
+.catalog-card { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+.catalog-artwork { display: grid; place-items: center; aspect-ratio: 600 / 825; padding: 14px; border-radius: 12px; background: var(--raised); }
+.catalog-artwork img { width: 100%; height: 100%; max-height: 292px; object-fit: contain; border-radius: 6px; }
+.catalog-artwork-missing { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+.catalog-artwork-missing .icon { width: 28px; height: 28px; }
+.catalog-card-copy { padding-top: 15px; padding-bottom: 16px; }
+.catalog-card-copy h3 { margin: 0; font-size: 1rem; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.catalog-card-copy p { margin-top: 5px; color: var(--muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.catalog-card .catalog-choose-button { width: 100%; min-height: 44px; margin-top: auto; border-color: var(--control-border); background: var(--surface); color: var(--text); }
+.catalog-pagination .catalog-page-button { min-height: 44px; border-color: var(--control-border); background: var(--surface); color: var(--text); }
+.catalog-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+.catalog-pagination p { color: var(--muted); }
+.catalog-pagination > div { display: flex; gap: 8px; }
+
+/* The first visit explains the task using existing card artwork. It never
+   presents illustrative cards as returned results or owned collection items. */
+.catalog-start { display: flex; align-items: center; gap: 48px; max-width: 860px; padding: 40px 16px; }
+.catalog-start-art { display: flex; align-items: center; flex-shrink: 0; padding: 10px 16px; }
+.catalog-start-art img { width: 112px; height: 154px; object-fit: contain; border-radius: 5px; }
+.catalog-start-art img + img { margin-left: -36px; }
+.catalog-start-art img:first-child { transform: rotate(-8deg) translateY(8px); }
+.catalog-start-art img:last-child { transform: rotate(8deg) translateY(8px); }
+.catalog-start-copy { max-width: 42ch; }
+.catalog-start-copy p { margin-top: 12px; line-height: 1.7; color: var(--muted); }
+.catalog-feedback { padding: 32px; border-radius: 12px; background: var(--raised); }
+.catalog-feedback p { margin-top: 10px; max-width: 65ch; color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; }
+.catalog-feedback-error { background: #fff0ee; color: #8d3225; }
+.catalog-feedback-error p { color: inherit; }
+.app-shell[data-theme='dark'] .catalog-feedback-error { background: #362320; color: #f0b4aa; }
+
+/* Loading reserves card-shaped space and respects reduced motion by staying still. */
+.catalog-loading-grid { margin-top: 24px; }
+.catalog-loading-card { aspect-ratio: 600 / 825; border-radius: 12px; background: var(--raised); }
+
+@media (hover: hover) and (pointer: fine) {
+  .catalog-search-input input:hover:not(:disabled) { border-color: var(--selected-edge); }
+  .catalog-choose-button:hover:not(:disabled), .catalog-page-button:hover:not(:disabled) { background: var(--active); }
+}
+
+@media (max-width: 1250px) {
+  .catalog-results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 20px; }
+}
+
+@media (max-width: 700px) {
+  .catalog-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 16px; }
+  .catalog-start { gap: 24px; padding-inline: 0; }
+  .catalog-start-art { padding-inline: 8px; }
+  .catalog-start-art img { width: 82px; height: 113px; }
+  .catalog-start-art img + img { margin-left: -30px; }
+}
+
+@media (max-width: 480px) {
+  .catalog-search-form { margin-top: 24px; padding: 20px 16px; }
+  .catalog-search-fields { align-items: stretch; flex-direction: column; }
+  .catalog-search-submit { width: 100%; }
+  .catalog-results { margin-top: 28px; }
+  .catalog-start { flex-direction: column; align-items: flex-start; gap: 26px; padding-top: 24px; }
+  .catalog-start-art { align-self: center; }
+  .catalog-start-copy { max-width: none; }
+  .catalog-artwork { padding: 8px; }
+  .catalog-card-copy h3 { font-size: 0.9375rem; }
+  .catalog-choose-button { padding-inline: 8px; }
+  .catalog-feedback { padding: 24px 20px; }
+  .catalog-pagination { gap: 12px; }
+}
