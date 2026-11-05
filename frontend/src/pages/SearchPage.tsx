@@ -11,6 +11,8 @@ import type {
   CatalogImportResponse,
   CatalogSearchResponse,
 } from '../api/catalog'
+import { createCollectionItem } from '../api/collection'
+import type { CardCondition } from '../api/collection'
 
 
 // Keep the response associated with the search that produced it.
@@ -19,12 +21,26 @@ type PrefetchedPage = {
   data: CatalogSearchResponse
 }
 
+type SearchPageProps = {
+  accessToken: string
+  onSessionExpired: () => void
+}
+
 // Own the search request here and pass its state into the UI components.
-export function SearchPage() {
+export function SearchPage({
+  accessToken,
+  onSessionExpired,
+}: SearchPageProps) {
+
   const [results, setResults] = useState<CatalogSearchResponse | null>(null)
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // A ref changes immediately, preventing two rapid clicks from sending two saves.
+  const saveInFlight = useRef(false)
 
   // Selection only opens the UI. Importing and saving will be connected next.
   const [selectedCard, setSelectedCard] = useState<CatalogCardSummary | null>(null)
@@ -49,11 +65,14 @@ export function SearchPage() {
     prefetchedPage.data.page === results.page + 1 &&
     prefetchedPage.data.items.length > 0
 
-    // Identify which search or page request is currently active.
-    // Changing a ref doesn't trigger another render.
-    const requestVersion = useRef(0)
+  // Identify which search or page request is currently active.
+  // Changing a ref doesn't trigger another render.
+  const requestVersion = useRef(0)
 
-    // React registers this cleanup when the search page opens and runs it when
+
+
+
+  // React registers this cleanup when the search page opens and runs it when
   // the page closes, invalidating any search or prefetch requests still in progress.
     useEffect(() => {
       return () => {
@@ -161,6 +180,75 @@ export function SearchPage() {
     }
   }
 
+
+  async function handleAddToCollection(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (saveInFlight.current || isImporting || !importedCard) return
+
+    // Read the fields before loading state disables them.
+    // FormData also includes the version radio linked through its form attribute.
+    const formData = new FormData(event.currentTarget)
+    const variantId = Number(formData.get('card_variant_id'))
+    const quantity = Number(formData.get('quantity'))
+
+    const conditions: CardCondition[] = [
+      'near_mint', 'lightly_played', 'moderately_played',
+      'heavily_played', 'damaged', 'unknown',
+    ]
+
+    // Finding a permitted value validates it and gives it the CardCondition type.
+    const condition = conditions.find(value => value === formData.get('condition'))
+
+    if (!condition || !Number.isInteger(quantity) ||
+        quantity < 1 || quantity > 2_147_483_647) {
+      setSaveError('Enter a valid quantity and choose a condition.')
+      return
+    }
+
+    // Only save a version belonging to the card currently open.
+    if (!importedCard.variants.some(variant => variant.id === variantId)) {
+      setSaveError('Choose an available card version.')
+      return
+    }
+
+    const version = importRequestVersion.current
+    saveInFlight.current = true
+    setIsSaving(true)
+    setSaveError(null)
+
+    try {
+      const savedItem = await createCollectionItem(accessToken, {
+        card_variant_id: variantId,
+        quantity,
+        condition,
+      })
+
+      // Ignore the result if this page or card was closed while waiting.
+      if (version !== importRequestVersion.current) return
+
+      if (savedItem === null) {
+        onSessionExpired()
+        return
+      }
+
+      // Close only after the backend confirms that the item was created.
+      handleCloseCard()
+    } catch (error) {
+      if (version !== importRequestVersion.current) return
+
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Could not add this card to your collection.',
+      )
+    } finally {
+      saveInFlight.current = false
+      if (version === importRequestVersion.current) {
+        setIsSaving(false)
+      }
+    }
+  }
+    
   
   function handleCloseCard() {
     // Invalidate the pending response before clearing the dialog.
@@ -169,6 +257,8 @@ export function SearchPage() {
     setImportedCard(null)
     setImportError(null)
     setIsImporting(false)
+    setSaveError(null)
+    setIsSaving(false)
   }
 
 
@@ -246,6 +336,9 @@ export function SearchPage() {
           importError={importError}
           onRetryImport={() => void handleSelectCard(selectedCard)}
           onClose={handleCloseCard}
+          isSaving={isSaving}
+          saveError={saveError}
+          onSubmit={event => void handleAddToCollection(event)}
         />
       )}
     </div>

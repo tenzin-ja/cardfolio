@@ -142,7 +142,11 @@ function App() {
           path="/search"
           element={
             accessToken
-              ? <SearchPage />
+              ? <SearchPage 
+                  accessToken={accessToken}
+                  //reuse logout to clear the session if tghe backend rejects its token
+                  onSessionExpired={handleLogout}
+                />
               : <Navigate to="/login" replace />
           }
         />
