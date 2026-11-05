@@ -1,0 +1,189 @@
+/* The inspector inherits AppShell's palette. Coral marks the price series;
+   the remaining surfaces and controls use Cardfolio's existing theme tokens. */
+.add-card-dialog {
+  --detail-accent: #f17a60;
+  --chart-ground: #151b19;
+  --chart-text: #c0cbc5;
+  --price-positive: #246342;
+  --price-negative: #a83c2b;
+  width: min(1160px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--ground);
+  color: var(--text);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--control-border) var(--ground);
+}
+.app-shell[data-theme='dark'] .add-card-dialog { --chart-ground: #0e1311; --price-positive: #9fceb1; --price-negative: #f0aa9e; }
+.add-card-dialog::backdrop { background: rgb(0 0 0 / 56%); }
+.card-inspector-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 56px; padding: 6px 20px 6px 28px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.card-inspector-toolbar > div { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 550; }
+.card-inspector-toolbar .icon { width: 17px; height: 17px; color: var(--muted); }
+.card-inspector-number { margin-left: 8px; padding-left: 18px; border-left: 1px solid var(--border); font-size: 0.8125rem; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.card-inspector-close { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text); }
+.card-inspector-close .icon { width: 20px; height: 20px; color: inherit; }
+.card-inspector-close:disabled { color: var(--muted); }
+
+/* After a single 24px gutter, the columns split the available space 41/59.
+   At 1160px: 2px border + 48px padding + 24px gap + 445px art + 641px details. */
+.add-card-body { display: grid; grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr); grid-template-areas: 'art identity' 'art pricing' 'art entry'; gap: 18px 24px; padding: 24px; }
+.add-card-heading { grid-area: identity; }
+.card-inspector-pricing { grid-area: pricing; }
+.add-card-form { grid-area: entry; }
+.card-inspector-art-column, .card-inspector-content { min-width: 0; }
+.card-inspector-art-column { grid-area: art; display: grid; grid-template-rows: auto 1fr; gap: 20px; }
+.add-card-preview { display: grid; place-items: center; min-width: 0; min-height: 430px; padding: 30px; border: 1px solid var(--border); border-radius: 14px; background: var(--raised); }
+.add-card-preview .catalog-artwork { width: min(100%, 286px); padding: 0; background: transparent; border-radius: 8px; }
+.add-card-preview .catalog-artwork img { max-height: none; border-radius: 8px; filter: drop-shadow(0 14px 16px rgb(0 0 0 / 17%)); }
+.add-card-preview .catalog-artwork-missing { min-height: 240px; padding: 20px; font-size: 0.875rem; }
+.add-card-preview .catalog-artwork-missing .icon { width: 36px; height: 36px; }
+.add-card-heading, .card-inspector-pricing, .add-card-form { min-width: 0; padding: 18px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.add-card-heading h2 { margin: 0; font-size: 1.625rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.025em; overflow-wrap: anywhere; }
+.add-card-heading > p { margin-top: 6px; color: var(--muted); font-size: 0.8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+.card-inspector-metadata { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 9px; font-size: 0.75rem; }
+.card-inspector-metadata > div { display: flex; gap: 6px; }
+.card-inspector-metadata dt { color: var(--muted); }
+.card-inspector-metadata dd { font-weight: 500; overflow-wrap: anywhere; }
+
+.card-version-picker { min-width: 0; align-self: end; margin: 0; padding: 0; border: 0; }
+.card-version-picker legend { margin-bottom: 10px; font-size: 0.875rem; font-weight: 550; }
+.card-version-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; }
+.card-version-option { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 76px; padding: 14px 25px 12px 13px; border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface); color: var(--text); }
+.card-version-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.card-version-option:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
+.card-version-option.is-selected { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.card-version-name { font-size: 0.8125rem; font-weight: 550; line-height: 1.4; overflow-wrap: anywhere; }
+.card-version-price { margin-top: auto; font-size: 0.75rem; color: var(--muted); }
+.card-version-option.is-selected .card-version-price { color: inherit; }
+.card-version-marker { position: absolute; top: 15px; right: 12px; width: 5px; height: 5px; border-radius: 50%; background: var(--control-border); pointer-events: none; }
+.card-version-option.is-selected .card-version-marker { background: var(--detail-accent); }
+.card-version-picker:disabled .card-version-option { border-color: var(--border); background: var(--raised); color: var(--muted); }
+.card-version-picker:disabled input { cursor: not-allowed; }
+.card-version-empty { padding: 16px; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.8125rem; }
+
+.card-inspector-pricing { position: relative; }
+.card-reference-price { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-right: 170px; }
+.card-reference-price p { font-size: 0.8125rem; color: var(--muted); }
+.card-reference-price p > span { overflow-wrap: anywhere; }
+.card-reference-price strong { display: block; margin-top: 6px; font-size: 2rem; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; overflow-wrap: anywhere; }
+.card-price-currency { position: absolute; top: 64px; right: 22px; color: var(--muted); font-size: 0.6875rem; white-space: nowrap; }
+.card-reference-unavailable { margin-top: 8px; font-size: 0.8125rem; color: var(--muted); }
+.card-price-history { margin-top: 12px; }
+.card-history-heading { position: absolute; top: 24px; right: 22px; }
+.card-history-heading h3 { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.card-history-ranges { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--raised); }
+.card-history-ranges button { display: grid; place-items: center; min-width: 32px; min-height: 28px; padding: 4px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 0.6875rem; font-weight: 550; }
+.card-history-ranges button[aria-pressed='true'] { background: var(--primary); color: var(--on-primary); }
+.card-history-ranges button:disabled { background: transparent; color: var(--muted); }
+.card-history-ranges button[aria-pressed='true']:disabled { background: var(--active); }
+.card-history-plot { min-height: 172px; overflow: hidden; border-radius: 10px; background: var(--chart-ground); color: var(--chart-text); }
+.card-chart-layout { padding: 18px 16px 8px 64px; }
+.card-chart-frame { position: relative; height: 112px; }
+.card-chart-frame svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.card-chart-y-label { position: absolute; right: calc(100% + 10px); transform: translateY(-50%); font-size: 11px; line-height: 1.2; white-space: nowrap; }
+.card-chart-dates { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 11px; white-space: nowrap; }
+.card-chart-dates.is-single { justify-content: center; }
+.card-chart-grid { stroke: #37443d; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.card-chart-line { fill: none; stroke: var(--detail-accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.card-chart-last { fill: var(--detail-accent); stroke: var(--chart-ground); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.card-history-feedback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 172px; padding: 22px; line-height: 1.6; text-align: center; overflow-wrap: anywhere; }
+.card-history-feedback > p { font-size: 0.875rem; font-weight: 550; }
+.card-history-feedback > span { max-width: 36ch; font-size: 0.75rem; }
+.card-history-feedback > button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--chart-text); border-radius: var(--radius); background: transparent; color: var(--chart-text); }
+.card-history-caption { margin-top: 9px; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.card-history-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.card-history-summary > div:nth-child(2) { text-align: center; }
+.card-history-summary > div:last-child { text-align: right; }
+.card-history-summary dt { color: var(--muted); font-size: 0.6875rem; }
+.card-history-summary dd { margin-top: 4px; font-size: 0.8125rem; font-weight: 550; overflow-wrap: anywhere; }
+.card-history-summary .card-price-change { color: var(--price-positive); }
+.card-history-summary .card-price-change.is-negative { color: var(--price-negative); }
+.card-history-data { margin-top: 9px; color: var(--muted); font-size: 0.75rem; }
+.card-history-data > summary { width: fit-content; min-height: 20px; padding: 2px 0; cursor: pointer; }
+.card-history-data > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.card-history-table-scroll { max-height: 220px; margin-top: 10px; overflow: auto; }
+.card-history-data table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.card-history-data th, .card-history-data td { padding: 8px 0; border-bottom: 1px solid var(--border); text-align: left; }
+.card-history-data th { font-weight: 400; }
+.card-history-data th:last-child, .card-history-data td:last-child { padding-left: 12px; text-align: right; }
+.card-history-data td { color: var(--text); }
+
+.card-add-heading { margin-bottom: 14px; }
+.card-add-heading h3 { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.card-add-heading p { margin-top: 4px; color: var(--muted); font-size: 0.8125rem; }
+.add-card-feedback:empty { display: none; }
+.add-card-feedback { margin-bottom: 18px; color: var(--muted); font-size: 0.8125rem; line-height: 1.6; overflow-wrap: anywhere; }
+.add-card-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.add-card-field { min-width: 0; }
+.add-card-field label { display: block; margin-bottom: 8px; font-size: 0.8125rem; font-weight: 500; }
+.add-card-field input, .add-card-field select { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: var(--radius); background: var(--surface); color: var(--text); caret-color: var(--focus); font-size: 0.875rem; transition: border-color 160ms var(--ease); }
+.add-card-field select { padding-right: 8px; }
+.add-card-field input:focus-visible, .add-card-field select:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.add-card-field input:disabled, .add-card-field select:disabled { opacity: 1; background: var(--raised); color: var(--muted); }
+.add-card-condition-hint { margin-top: 8px; color: var(--muted); font-size: 0.75rem; line-height: 1.6; }
+.add-card-details-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 16px; }
+.add-card-error { color: var(--text); line-height: 1.6; overflow-wrap: anywhere; }
+.add-card-error-title { margin-bottom: 4px; font-weight: 600; }
+.add-card-form > .add-card-error { margin-top: 16px; font-size: 0.8125rem; }
+.add-card-retry { min-height: 44px; margin-top: 6px; padding: 6px 0; border: 0; background: transparent; color: var(--text); font-weight: 550; text-decoration: underline; text-underline-offset: 3px; }
+.add-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.add-card-actions .button { min-height: 44px; }
+.add-card-actions .add-card-cancel { border-color: var(--control-border); background: var(--surface); color: var(--text); }
+.add-card-actions .icon { width: 16px; height: 16px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .card-inspector-close:hover:not(:disabled), .add-card-cancel:hover:not(:disabled) { background: var(--active); }
+  .card-version-option:hover:not(.is-selected):not(:has(input:disabled)) { border-color: var(--selected-edge); }
+  .card-history-ranges button:hover:not(:disabled):not([aria-pressed='true']) { background: var(--active); color: var(--text); }
+  .add-card-field input:hover:not(:disabled), .add-card-field select:hover:not(:disabled) { border-color: var(--selected-edge); }
+  .add-card-retry:hover:not(:disabled) { text-decoration-thickness: 2px; }
+}
+
+@media (max-width: 950px) {
+  .add-card-dialog { width: calc(100vw - 32px); }
+  .add-card-body { grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr); gap: 18px; padding: 20px; }
+  .add-card-preview { min-height: 350px; padding: 22px; }
+  .add-card-heading, .card-inspector-pricing, .add-card-form { padding: 18px; }
+  .card-reference-price { padding-right: 0; }
+  .card-price-currency { position: static; align-self: flex-end; padding-bottom: 3px; }
+  .card-history-heading { position: static; display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .card-history-heading h3 { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip-path: none; white-space: normal; font-size: 0.8125rem; font-weight: 550; }
+  .card-history-ranges button { min-width: 28px; padding-inline: 5px; }
+  .card-version-options { grid-template-columns: minmax(0, 1fr); }
+  .card-version-option { min-height: 64px; flex-direction: row; align-items: center; gap: 12px; }
+  .card-version-price { margin-top: 0; margin-left: auto; flex: none; }
+  .add-card-actions .button-primary { flex: 1; }
+}
+
+@media (max-width: 700px) {
+  .add-card-dialog { max-height: calc(100dvh - 24px); width: calc(100vw - 24px); border-radius: 14px; }
+  .card-inspector-toolbar { min-height: 52px; padding-left: 18px; padding-right: 10px; }
+  .add-card-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'identity' 'art' 'pricing' 'entry'; gap: 20px; padding: 16px; }
+  .card-inspector-art-column { grid-template-columns: minmax(100px, 0.8fr) minmax(0, 1.2fr); grid-template-rows: auto; gap: 12px; align-items: start; }
+  .card-version-picker { align-self: start; }
+  .add-card-preview { min-height: 180px; padding: 12px; }
+  .add-card-preview .catalog-artwork { width: min(100%, 150px); }
+  .add-card-preview .catalog-artwork-missing { min-height: 150px; padding: 6px; font-size: 0.75rem; }
+  .card-version-options { grid-template-columns: minmax(0, 1fr); }
+  .card-version-option { flex-direction: column; align-items: flex-start; gap: 6px; min-height: 72px; }
+  .card-version-price { margin-top: auto; margin-left: 0; }
+  .add-card-heading h2 { font-size: 1.5rem; }
+  .add-card-heading, .card-inspector-pricing, .add-card-form { padding: 18px 16px; border-radius: 12px; }
+  .card-reference-price strong { font-size: 1.875rem; }
+  .card-history-ranges button { min-height: 44px; min-width: 36px; }
+  .card-history-plot { min-height: 150px; }
+  .card-chart-layout { padding-left: 58px; padding-right: 14px; }
+  .card-chart-frame { height: 132px; }
+  .card-history-feedback { min-height: 150px; padding: 18px; }
+  .card-history-summary { gap: 8px; }
+  .card-history-summary dd { font-size: 0.75rem; }
+  .card-history-data > summary { min-height: 44px; display: flex; align-items: center; }
+  .add-card-details-row { grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }
+  .add-card-actions { flex-wrap: nowrap; gap: 8px; }
+  .add-card-actions .button-primary { flex: 1; padding-inline: 10px; }
+}

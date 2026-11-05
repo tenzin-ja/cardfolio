@@ -5,6 +5,8 @@ import type { CatalogSearchResponse } from '../api/catalog'
 import { PageHeader } from '../components/PageHeader'
 import { SearchForm } from '../components/search/SearchForm'
 import { SearchResults } from '../components/search/SearchResults'
+import type { CatalogCardSummary } from '../components/search/SearchResults'
+import { AddCardDialog } from '../components/search/AddCardDialog'
 import '../components/search/search.css'
 
 
@@ -20,6 +22,9 @@ export function SearchPage() {
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Selection only opens the UI. Importing and saving will be connected next.
+  const [selectedCard, setSelectedCard] = useState<CatalogCardSummary | null>(null)
 
   // null means there isn't a usable next page cached.
   const [prefetchedPage, setPrefetchedPage] = useState<PrefetchedPage | null>(null)
@@ -167,7 +172,17 @@ export function SearchPage() {
         page={results?.page ?? 1}
         canGoNext={canGoNext}
         onPageChange={handlePageChange}
+        onSelectCard={setSelectedCard}
       />
+
+      {selectedCard && (
+        <AddCardDialog
+          // A different card starts with fresh form values and artwork state.
+          key={`${selectedCard.provider}:${selectedCard.provider_card_id}`}
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+        />
+      )}
     </div>
   )
 }

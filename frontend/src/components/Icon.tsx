@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type IconName = 'cards' | 'search' | 'sun' | 'moon' | 'grid' | 'list' | 'plus' | 'user' | 'check' | 'logout'
+type IconName = 'cards' | 'search' | 'sun' | 'moon' | 'grid' | 'list' | 'plus' | 'user' | 'check' | 'logout' | 'close'
 
 // Store only the shapes here; the shared SVG below sets size and stroke style.
 const shapes: Record<IconName, ReactNode> = {
@@ -13,6 +13,7 @@ const shapes: Record<IconName, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   user: <><circle cx="12" cy="8" r="3.5" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>,
   check: <path d="m5 12 4 4L19 6" />,
+  close: <path d="m6 6 12 12M6 18 18 6" />,
   // The exit arrow follows the same outline style as the navigation icons.
   logout: <><path d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4" /><path d="m16 8 4 4-4 4M20 12H9" /></>,
 }

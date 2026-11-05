@@ -27,7 +27,8 @@ export type SearchResultsProps = {
   onSelectCard?: (card: CatalogCardSummary) => void
 }
 
-function CatalogArtwork({ card }: { card: CatalogCardSummary }) {
+// Reuse the same artwork and missing-image state in the add-card dialog.
+export function CatalogArtwork({ card }: { card: CatalogCardSummary }) {
   const [imageFailed, setImageFailed] = useState(false)
 
   // Missing and broken provider images use the same reserved portrait space.
@@ -138,10 +139,13 @@ export function SearchResults({
                 <h3>{card.name}</h3>
                 <p>Card #{card.card_number}</p>
               </div>
-              <button className="button catalog-choose-button" type="button"
+              {/* One native button covers the tile, so clicking the artwork or
+                  title works, with Enter/Space support supplied by the browser. */}
+              <button className="catalog-card-open" type="button"
                 disabled={!onSelectCard}
-                aria-label={`Choose ${card.name}, card ${card.card_number}`}
-                onClick={() => onSelectCard?.(card)}>Choose card</button>
+                aria-label={`View ${card.name}, card ${card.card_number}`}
+                aria-haspopup="dialog"
+                onClick={() => onSelectCard?.(card)} />
             </article>
           </li>
         ))}
