@@ -71,6 +71,8 @@ export function AddCardDialog({
   // The same selection controls the price, chart, and submitted variant ID.
   const selectedVariant = variants.find(variant => variant.id === selectedVariantId) ?? variants[0]
   const currency = selectedVariant?.currency ?? 'USD'
+  // Zero is a valid price; only missing or invalid values show the message.
+  const hasReferencePrice = readCardPrice(selectedVariant?.market_price) !== null
   const variantName = selectedVariant
     ? selectedVariant.variant_name || selectedVariant.variant_key.replaceAll('_', ' ')
     : 'Version unavailable'
@@ -178,13 +180,16 @@ export function AddCardDialog({
             <div className="card-reference-price">
               <div>
                 <p>Reference price <span>· {variantName}</span></p>
-                <strong>{formatCardPrice(selectedVariant?.market_price, currency)}</strong>
+                {hasReferencePrice ? (
+                  <strong>{formatCardPrice(selectedVariant?.market_price, currency)}</strong>
+                ) : (
+                  <p className="card-reference-unavailable" role="status">
+                    {isImporting ? 'Loading reference price…' : 'No reference price is available for this version.'}
+                  </p>
+                )}
               </div>
-              <span className="card-price-currency">{currency} / card</span>
+              {hasReferencePrice && <span className="card-price-currency">{currency} / card</span>}
             </div>
-            {selectedVariant && readCardPrice(selectedVariant.market_price) === null && (
-              <p className="card-reference-unavailable">No reference price is available for this version.</p>
-            )}
             <CardPriceChart points={historyPoints} currency={currency}
               isLoading={isImporting || isHistoryLoading}
               error={historyError} onRetry={onRetryHistory} />

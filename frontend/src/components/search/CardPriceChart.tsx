@@ -158,13 +158,15 @@ export function CardPriceChart({
         </div>
       )}
 
-      <dl className="card-history-summary">
-        <div><dt>Period low</dt><dd>{isLoading || error ? '—' : formatCardPrice(low, currency)}</dd></div>
+      {/* The chart's feedback already explains missing history. Show the
+          summary only when there are recorded prices to summarize. */}
+      {!feedback && <dl className="card-history-summary">
+        <div><dt>Period low</dt><dd>{formatCardPrice(low, currency)}</dd></div>
         <div><dt>Period change</dt><dd className={change === null || change === 0 ? '' : change < 0 ? 'card-price-change is-negative' : 'card-price-change'}>
-          {isLoading || error ? '—' : changeText ?? '—'}
+          {changeText ?? 'Not enough history'}
         </dd></div>
-        <div><dt>Period high</dt><dd>{isLoading || error ? '—' : formatCardPrice(high, currency)}</dd></div>
-      </dl>
+        <div><dt>Period high</dt><dd>{formatCardPrice(high, currency)}</dd></div>
+      </dl>}
 
       {!feedback && (
         <details className="card-history-data">

@@ -10,7 +10,7 @@ export function readCardPrice(value: CardPrice): number | null {
 
 export function formatCardPrice(value: CardPrice, currency: string): string {
   const price = readCardPrice(value)
-  if (price === null) return '—'
+  if (price === null) return 'Price unavailable'
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,

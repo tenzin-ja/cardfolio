@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { searchCatalog } from '../api/catalog'
-import type { CatalogSearchResponse } from '../api/catalog'
 import { PageHeader } from '../components/PageHeader'
 import { SearchForm } from '../components/search/SearchForm'
 import { SearchResults } from '../components/search/SearchResults'
 import type { CatalogCardSummary } from '../components/search/SearchResults'
 import { AddCardDialog } from '../components/search/AddCardDialog'
 import '../components/search/search.css'
+import { importCatalogCard, searchCatalog } from '../api/catalog'
+import type {
+  CatalogImportResponse,
+  CatalogSearchResponse,
+} from '../api/catalog'
 
 
 // Keep the response associated with the search that produced it.
@@ -25,6 +28,14 @@ export function SearchPage() {
 
   // Selection only opens the UI. Importing and saving will be connected next.
   const [selectedCard, setSelectedCard] = useState<CatalogCardSummary | null>(null)
+
+  const [importedCard, setImportedCard] =
+  useState<CatalogImportResponse | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  // Keep imports separate from the counter used by search and pagination.
+  const importRequestVersion = useRef(0)
 
   // null means there isn't a usable next page cached.
   const [prefetchedPage, setPrefetchedPage] = useState<PrefetchedPage | null>(null)
@@ -46,7 +57,9 @@ export function SearchPage() {
   // the page closes, invalidating any search or prefetch requests still in progress.
     useEffect(() => {
       return () => {
+        // Ignore pending responses after leaving the search page.
         requestVersion.current += 1
+        importRequestVersion.current += 1
       }
     }, [])
 
@@ -112,7 +125,53 @@ export function SearchPage() {
     }
   }
 
+  //Coordinator for when a card is clicked
+  //Calls importcatalogcard to recieve info from backend, and handles errors
+  async function handleSelectCard(card: CatalogCardSummary) {
+  const version = ++importRequestVersion.current
+
+  // Open the dialog immediately, then load its additional details.
+  setSelectedCard(card)
+  setImportedCard(null)
+  setIsImporting(true)
+  setImportError(null)
+
+  try {
+    const data = await importCatalogCard(card.provider_card_id)
+
+    // The dialog may have closed or another card may have been selected.
+    if (version !== importRequestVersion.current) return
+
+    setImportedCard(data)
+
+  } catch (error) {
+    if (version !== importRequestVersion.current) return
+
+    setImportError(
+      error instanceof Error
+        ? error.message
+        : 'Could not load this card. Please try again.',
+    )
+
+  } finally {
+      // An older request must not clear a newer request's loading state.
+      if (version === importRequestVersion.current) {
+        setIsImporting(false)
+      }
+    }
+  }
+
   
+  function handleCloseCard() {
+    // Invalidate the pending response before clearing the dialog.
+    importRequestVersion.current += 1
+    setSelectedCard(null)
+    setImportedCard(null)
+    setImportError(null)
+    setIsImporting(false)
+  }
+
+
   function handleSearch(event: SubmitEvent<HTMLFormElement>) {
     // Read the fields before loading state disables the form.
     const formData = new FormData(event.currentTarget)
@@ -151,6 +210,7 @@ export function SearchPage() {
     // This page is now visible. Check beyond it only if it's full.
     void prefetchNextPage(submittedQuery, cachedPage, version)
   }
+  
 
   return (
     <div className="catalog-search-page">
@@ -172,15 +232,20 @@ export function SearchPage() {
         page={results?.page ?? 1}
         canGoNext={canGoNext}
         onPageChange={handlePageChange}
-        onSelectCard={setSelectedCard}
+        // Start the async handler; it handles its own request errors.
+        onSelectCard={card => void handleSelectCard(card)}
       />
 
       {selectedCard && (
         <AddCardDialog
-          // A different card starts with fresh form values and artwork state.
           key={`${selectedCard.provider}:${selectedCard.provider_card_id}`}
-          card={selectedCard}
-          onClose={() => setSelectedCard(null)}
+          // Use the full imported card once it arrives.
+          card={importedCard ?? selectedCard}
+          details={importedCard}
+          isImporting={isImporting}
+          importError={importError}
+          onRetryImport={() => void handleSelectCard(selectedCard)}
+          onClose={handleCloseCard}
         />
       )}
     </div>
