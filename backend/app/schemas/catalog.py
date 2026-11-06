@@ -89,8 +89,8 @@ class CatalogImportRequest(BaseModel):
     provider_card_id: str = Field(
         min_length = 1,
         max_length = 100,
-        #restrict id to letters,digits, etc
-        pattern=r"^[A-Za-z0-9_-]+$"
+        # Allow periods in set IDs, while rejecting URL path/query separators.
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$"
     )
 
 class CatalogImportVariantResponse(CatalogVariantSearchResult):
