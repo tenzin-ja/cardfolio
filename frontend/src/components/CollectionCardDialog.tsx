@@ -10,7 +10,8 @@ import './search/add-card.css'
 type CollectionCardDialogProps = {
   item: CollectionItem
   onClose: () => void
-  onSave: (changes: CollectionItemUpdate) => Promise<void>
+  onSave: (changes: CollectionItemUpdate) => Promise<CollectionItem | null>
+  onRemove: () => Promise<void>
 }
 
 const conditionOptions: { value: CardCondition; label: string }[] = [
@@ -23,23 +24,32 @@ const conditionOptions: { value: CardCondition; label: string }[] = [
 ]
 const MAX_QUANTITY = 2_147_483_647
 
-export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDialogProps) {
+export function CollectionCardDialog({ item, onClose, onSave, onRemove }: CollectionCardDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const detailsHeadingRef = useRef<HTMLHeadingElement>(null)
-  const saveInFlight = useRef(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const removeButtonRef = useRef<HTMLButtonElement>(null)
+  const keepEntryRef = useRef<HTMLButtonElement>(null)
+  const actionInFlight = useRef(false)
+  const [quantityDraft, setQuantityDraft] = useState(String(item.quantity))
+  const [conditionDraft, setConditionDraft] = useState(item.condition)
+  const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false)
+  const [pendingAction, setPendingAction] = useState<'save' | 'remove' | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const titleId = useId()
   const setId = useId()
   const detailsId = useId()
   const priceId = useId()
   const quantityId = useId()
   const conditionId = useId()
+  const removalId = useId()
+  const removalPromptId = useId()
   const variant = item.card_variant
   const card = variant.catalog_card
   const version = variant.variant_name || variant.variant_key.replaceAll('_', ' ')
   const hasPrice = readCardPrice(variant.market_price) !== null
+  const draftQuantity = Number(quantityDraft)
+  const canStepQuantity = Number.isInteger(draftQuantity) && draftQuantity >= 1 && draftQuantity <= MAX_QUANTITY
+  const isBusy = pendingAction !== null
+  const editDisabled = isBusy || isConfirmingRemoval
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -55,21 +65,46 @@ export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDi
     }
   }, [])
 
-  function finishEditing() {
-    setIsEditing(false)
-    setSaveError(null)
-    detailsHeadingRef.current?.focus({ preventScroll: true })
+  useEffect(() => {
+    if (isConfirmingRemoval) keepEntryRef.current?.focus()
+  }, [isConfirmingRemoval])
+
+  function resetDraft(savedItem: CollectionItem) {
+    setQuantityDraft(String(savedItem.quantity))
+    setConditionDraft(savedItem.condition)
+    setActionError(null)
+  }
+
+  function cancelRemoval() {
+    setIsConfirmingRemoval(false)
+    setActionError(null)
+    removeButtonRef.current?.focus()
+  }
+
+  async function handleRemove() {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
+    setPendingAction('remove')
+    setActionError(null)
+    try {
+      await onRemove()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not remove the entry. Please try again.')
+    } finally {
+      actionInFlight.current = false
+      setPendingAction(null)
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (saveInFlight.current) return
+    if (actionInFlight.current || isConfirmingRemoval) return
 
     const form = new FormData(event.currentTarget)
     const quantity = Number(form.get('quantity'))
     const condition = conditionOptions.find(option => option.value === form.get('condition'))?.value
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY || !condition) {
-      setSaveError('Enter a valid quantity and choose a condition.')
+      setActionError('Enter a valid quantity and choose a condition.')
       return
     }
 
@@ -78,21 +113,21 @@ export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDi
     if (quantity !== item.quantity) changes.quantity = quantity
     if (condition !== item.condition) changes.condition = condition
     if (Object.keys(changes).length === 0) {
-      finishEditing()
+      resetDraft(item)
       return
     }
 
-    saveInFlight.current = true
-    setIsSaving(true)
-    setSaveError(null)
+    actionInFlight.current = true
+    setPendingAction('save')
+    setActionError(null)
     try {
-      await onSave(changes)
-      finishEditing()
+      const savedItem = await onSave(changes)
+      if (savedItem) resetDraft(savedItem)
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Could not save changes. Please try again.')
+      setActionError(error instanceof Error ? error.message : 'Could not save changes. Please try again.')
     } finally {
-      saveInFlight.current = false
-      setIsSaving(false)
+      actionInFlight.current = false
+      setPendingAction(null)
     }
   }
 
@@ -103,9 +138,10 @@ export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDi
       aria-labelledby={titleId}
       aria-describedby={setId}
       onCancel={event => {
-        // Let the parent clear its selection when Escape closes the dialog.
         event.preventDefault()
-        if (!saveInFlight.current) onClose()
+        if (actionInFlight.current) return
+        if (isConfirmingRemoval) cancelRemoval()
+        else onClose()
       }}
     >
       <div className="card-inspector-toolbar">
@@ -118,7 +154,7 @@ export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDi
           className="card-inspector-close"
           type="button"
           onClick={onClose}
-          disabled={isSaving}
+          disabled={isBusy}
           aria-label="Close saved card details"
         >
           <Icon name="close" />
@@ -158,49 +194,102 @@ export function CollectionCardDialog({ item, onClose, onSave }: CollectionCardDi
 
         <section className="add-card-form" aria-labelledby={detailsId}>
           <div className="card-add-heading">
-            <h3 id={detailsId} ref={detailsHeadingRef} tabIndex={-1}>Collection details</h3>
+            <h3 id={detailsId}>Collection details</h3>
           </div>
-          {isEditing ? (
-            <form onSubmit={handleSubmit}>
-              <fieldset className="add-card-fields" disabled={isSaving}>
-                <legend className="sr-only">Edit collection details</legend>
-                <div className="add-card-details-row">
-                  <div className="add-card-field">
-                    <label htmlFor={quantityId}>Quantity</label>
-                    <input id={quantityId} name="quantity" type="number" inputMode="numeric"
-                      min={1} max={MAX_QUANTITY} step={1} defaultValue={item.quantity} autoFocus required />
-                  </div>
-                  <div className="add-card-field">
-                    <label htmlFor={conditionId}>Condition</label>
-                    <select id={conditionId} name="condition" defaultValue={item.condition} required>
-                      {conditionOptions.map(({ value, label }) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+          <form onSubmit={handleSubmit}>
+            <fieldset className="add-card-fields" disabled={isBusy}>
+              <legend className="sr-only">Edit collection details</legend>
+              <div className="add-card-details-row">
+                <div className="add-card-field">
+                  <label htmlFor={quantityId}>Quantity</label>
+                  <div className="collection-quantity">
+                    <button
+                      type="button"
+                      aria-label="Decrease quantity"
+                      disabled={isConfirmingRemoval || !canStepQuantity || draftQuantity === 1}
+                      onClick={() => setQuantityDraft(String(draftQuantity - 1))}
+                    >
+                      <Icon name="minus" />
+                    </button>
+                    <input
+                      id={quantityId}
+                      name="quantity"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_QUANTITY}
+                      step={1}
+                      value={quantityDraft}
+                      onChange={event => setQuantityDraft(event.currentTarget.value)}
+                      disabled={isConfirmingRemoval}
+                      required
+                    />
+                    <button
+                      type="button"
+                      aria-label="Increase quantity"
+                      disabled={isConfirmingRemoval || !canStepQuantity || draftQuantity === MAX_QUANTITY}
+                      onClick={() => setQuantityDraft(String(draftQuantity + 1))}
+                    >
+                      <Icon name="plus" />
+                    </button>
                   </div>
                 </div>
-              </fieldset>
-              {saveError && <p className="add-card-error add-card-feedback" role="alert">{saveError}</p>}
-              <div className="add-card-actions">
-                <button className="button add-card-cancel" type="button"
-                  onClick={finishEditing} disabled={isSaving}>Cancel</button>
-                <button className="button button-primary" type="submit" disabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Save changes'}
+                <div className="add-card-field">
+                  <label htmlFor={conditionId}>Condition</label>
+                  <select id={conditionId} name="condition" value={conditionDraft}
+                    onChange={event => setConditionDraft(event.currentTarget.value as CardCondition)}
+                    disabled={isConfirmingRemoval} required>
+                    {conditionOptions.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  ref={removeButtonRef}
+                  className="button collection-remove-button"
+                  type="button"
+                  aria-label={isConfirmingRemoval ? 'Hide removal confirmation' : 'Remove entry'}
+                  aria-expanded={isConfirmingRemoval}
+                  aria-controls={isConfirmingRemoval ? removalId : undefined}
+                  title="Remove entry"
+                  onClick={() => {
+                    if (isConfirmingRemoval) cancelRemoval()
+                    else {
+                      setActionError(null)
+                      setIsConfirmingRemoval(true)
+                    }
+                  }}
+                >
+                  <Icon name="trash" />
                 </button>
               </div>
-            </form>
-          ) : (
-            <>
-              <dl className="card-facts">
-                <div><dt>Card version</dt><dd>{version}</dd></div>
-                <div><dt>Condition</dt><dd>{item.condition.replaceAll('_', ' ')}</dd></div>
-                <div><dt>Quantity</dt><dd>{item.quantity}</dd></div>
-              </dl>
+            </fieldset>
+            {actionError && !isConfirmingRemoval && (
+              <p className="add-card-error add-card-feedback" role="alert">{actionError}</p>
+            )}
+            <div className="add-card-actions">
+              <button className="button add-card-cancel" type="button"
+                onClick={() => resetDraft(item)} disabled={editDisabled}>Cancel</button>
+              <button className="button button-primary" type="submit" disabled={editDisabled}>
+                {pendingAction === 'save' ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+          {isConfirmingRemoval && (
+            <div id={removalId} className="collection-remove-confirmation" role="group" aria-labelledby={removalPromptId}>
+              <p id={removalPromptId}>
+                Remove {item.quantity} {item.quantity === 1 ? 'copy' : 'copies'} of {card.name} ({version}, {item.condition.replaceAll('_', ' ')}) from your collection?
+              </p>
+              {actionError && <p className="add-card-error" role="alert">{actionError}</p>}
               <div className="add-card-actions">
-                <button className="button add-card-cancel" type="button"
-                  onClick={() => setIsEditing(true)}>Edit</button>
+                <button ref={keepEntryRef} className="button add-card-cancel" type="button"
+                  onClick={cancelRemoval} disabled={isBusy}>Keep entry</button>
+                <button className="button collection-remove-confirm" type="button"
+                  onClick={handleRemove} disabled={isBusy}>
+                  {pendingAction === 'remove' ? 'Removing…' : 'Remove entry'}
+                </button>
               </div>
-            </>
+            </div>
           )}
         </section>
       </div>

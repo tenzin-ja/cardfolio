@@ -193,3 +193,77 @@
 .collection-card-dialog .add-card-body { align-items: start; }
 .collection-card-dialog .add-card-preview { grid-area: art; }
 .collection-card-dialog .card-facts { gap: 8px; margin-top: 0; }
+
+.collection-card-dialog .add-card-details-row {
+  grid-template-columns: minmax(160px, 0.85fr) minmax(0, 1fr) 44px;
+  align-items: end;
+}
+
+.collection-quantity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.collection-quantity button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) - 1px);
+  background: transparent;
+  color: var(--text);
+}
+
+.collection-quantity button:disabled { color: var(--muted); opacity: 0.55; }
+.collection-quantity .icon { width: 16px; height: 16px; }
+
+.collection-quantity input {
+  appearance: textfield;
+  padding-inline: 6px;
+  border: 0;
+  border-inline: 1px solid var(--border);
+  border-radius: 0;
+  text-align: center;
+}
+
+.collection-quantity input::-webkit-inner-spin-button,
+.collection-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.collection-quantity :is(input, button):focus-visible { outline-offset: -2px; }
+
+.collection-remove-button,
+.collection-remove-confirm {
+  min-height: 44px;
+  border-color: var(--control-border);
+  background: var(--surface);
+  color: var(--price-negative);
+}
+
+.collection-remove-button { width: 44px; padding: 0; }
+.collection-remove-button .icon { width: 18px; height: 18px; }
+
+.collection-remove-confirmation {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.collection-remove-confirmation .add-card-error { margin-top: 8px; }
+.collection-remove-confirmation .add-card-actions { flex-wrap: wrap; }
+
+@media (hover: hover) and (pointer: fine) {
+  .collection-quantity button:hover:not(:disabled) { background: var(--active); }
+  :is(.collection-remove-button, .collection-remove-confirm):hover:not(:disabled) { background: var(--active); }
+}
+
+@media (max-width: 480px) {
+  .collection-card-dialog .add-card-details-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .collection-card-dialog .add-card-details-row > :first-child { grid-column: 1 / -1; }
+}

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { getCollectionItems, updateCollectionItem } from '../api/collection'
+import { deleteCollectionItem, getCollectionItems, updateCollectionItem } from '../api/collection'
 import type { CollectionItem, CollectionItemUpdate } from '../api/collection'
 import { CollectionCardDialog } from '../components/CollectionCardDialog'
 import { PageHeader } from '../components/PageHeader'
@@ -26,6 +26,8 @@ export function CollectionPage({
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const addCardLink = useRef<HTMLAnchorElement>(null)
+  const focusAfterRemoval = useRef(false)
   // Read the selected entry from the page we already loaded.
   const selectedItem = items.find(item => item.id === selectedItemId)
 
@@ -78,15 +80,42 @@ export function CollectionPage({
     // Changing the page or retry counter triggers another request.
   }, [accessToken, onSessionExpired, page, retryAttempt])
 
+  useEffect(() => {
+    if (selectedItemId !== null || !focusAfterRemoval.current) return
+    focusAfterRemoval.current = false
+    // The dialog's original focus target was the tile that just disappeared.
+    addCardLink.current?.focus()
+  }, [selectedItemId])
+
   async function handleSaveItem(itemId: number, changes: CollectionItemUpdate) {
     const updatedItem = await updateCollectionItem(accessToken, itemId, changes)
     if (updatedItem === null) {
       onSessionExpired()
-      return
+      return null
     }
 
     // The dialog and grid read from the same list, so both update in place.
     setItems(current => current.map(item => item.id === itemId ? updatedItem : item))
+    return updatedItem
+  }
+
+  async function handleRemoveItem(itemId: number) {
+    const removed = await deleteCollectionItem(accessToken, itemId)
+    if (removed === null) {
+      onSessionExpired()
+      return
+    }
+
+    focusAfterRemoval.current = true
+    setSelectedItemId(null)
+    setItems(current => current.filter(item => item.id !== itemId))
+
+    // Reload to fill the empty slot and get the correct Next button state.
+    if (page > 1 && items.length === 1 && !hasNextPage) {
+      setPage(current => current - 1)
+    } else {
+      setRetryAttempt(current => current + 1)
+    }
   }
 
   return (
@@ -99,7 +128,7 @@ export function CollectionPage({
           ) : undefined
         }
         actions={
-          <Link className="button button-primary" to="/search">
+          <Link ref={addCardLink} className="button button-primary" to="/search">
             Add card
           </Link>
         }
@@ -227,6 +256,7 @@ export function CollectionPage({
           item={selectedItem}
           onClose={() => setSelectedItemId(null)}
           onSave={changes => handleSaveItem(selectedItem.id, changes)}
+          onRemove={() => handleRemoveItem(selectedItem.id)}
         />
       )}
     </>

@@ -157,3 +157,23 @@ export async function updateCollectionItem(
 
   return response.json()
 }
+
+export async function deleteCollectionItem(
+  accessToken: string,
+  itemId: number,
+): Promise<true | null> {
+  let response: Response
+  try {
+    response = await fetch(`/api/collection-items/${itemId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch {
+    throw new Error('Could not reach Cardfolio. Please try again.')
+  }
+
+  if (response.status === 401) return null
+  // A retry can find the entry already gone if the first response was lost.
+  if (response.status === 204 || response.status === 404) return true
+  throw new Error('Could not remove the entry. Please try again.')
+}

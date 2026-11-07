@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type IconName = 'cards' | 'search' | 'sun' | 'moon' | 'grid' | 'list' | 'plus' | 'user' | 'check' | 'logout' | 'close'
+type IconName = 'cards' | 'search' | 'sun' | 'moon' | 'grid' | 'list' | 'plus' | 'minus' | 'user' | 'check' | 'logout' | 'close' | 'trash'
 
 // Store only the shapes here; the shared SVG below sets size and stroke style.
 const shapes: Record<IconName, ReactNode> = {
@@ -11,6 +11,8 @@ const shapes: Record<IconName, ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
   list: <><path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  trash: <path d="M4 6h16M9 6V4h6v2m3 0-1 14H7L6 6m4 4v6m4-6v6" />,
   user: <><circle cx="12" cy="8" r="3.5" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
