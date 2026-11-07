@@ -618,6 +618,47 @@ def test_update_collection_item_changes_only_supplied_fields(auth_headers):
     assert data["condition"] == "near_mint"
     assert data["card_variant_id"] == variant_id
 
+
+@pytest.mark.parametrize(
+    "other_notes, expected_status",
+    [(None, 409), ("Separate purchase", 200)],
+    ids=["identical-entry", "distinct-purchase"],
+)
+def test_update_collection_item_checks_for_duplicate_condition(
+    auth_headers, collection_variant_id, other_notes, expected_status
+):
+    payload = {"card_variant_id": collection_variant_id, "quantity": 2}
+    first = client.post(
+        "/collection-items", headers=auth_headers,
+        json={**payload, "condition": "near_mint", "notes": other_notes},
+    )
+    second = client.post(
+        "/collection-items", headers=auth_headers,
+        json={**payload, "condition": "lightly_played"},
+    )
+    assert first.status_code == second.status_code == 201
+    second_id = second.json()["id"]
+
+    response = client.patch(
+        f"/collection-items/{second_id}", headers=auth_headers,
+        json={"condition": "near_mint", "quantity": 3},
+    )
+    assert response.status_code == expected_status
+
+    # A rejected edit preserves both entries, including the attempted quantity change.
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    original, edited = listing.json()
+    assert (original["id"], original["quantity"], original["notes"]) == (
+        first.json()["id"], 2, other_notes,
+    )
+    assert edited["id"] == second_id
+    if expected_status == 409:
+        assert (edited["condition"], edited["quantity"]) == ("lightly_played", 2)
+    else:
+        assert (edited["condition"], edited["quantity"]) == ("near_mint", 3)
+
+
 def test_delete_collection_item_removes_item_but_preserves_variant(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { getCollectionItems } from '../api/collection'
-import type { CollectionItem } from '../api/collection'
+import { getCollectionItems, updateCollectionItem } from '../api/collection'
+import type { CollectionItem, CollectionItemUpdate } from '../api/collection'
 import { CollectionCardDialog } from '../components/CollectionCardDialog'
 import { PageHeader } from '../components/PageHeader'
 import { CatalogArtwork } from '../components/search/SearchResults'
@@ -77,6 +77,17 @@ export function CollectionPage({
     }
     // Changing the page or retry counter triggers another request.
   }, [accessToken, onSessionExpired, page, retryAttempt])
+
+  async function handleSaveItem(itemId: number, changes: CollectionItemUpdate) {
+    const updatedItem = await updateCollectionItem(accessToken, itemId, changes)
+    if (updatedItem === null) {
+      onSessionExpired()
+      return
+    }
+
+    // The dialog and grid read from the same list, so both update in place.
+    setItems(current => current.map(item => item.id === itemId ? updatedItem : item))
+  }
 
   return (
     <>
@@ -215,6 +226,7 @@ export function CollectionPage({
         <CollectionCardDialog
           item={selectedItem}
           onClose={() => setSelectedItemId(null)}
+          onSave={changes => handleSaveItem(selectedItem.id, changes)}
         />
       )}
     </>

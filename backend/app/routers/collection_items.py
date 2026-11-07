@@ -145,6 +145,9 @@ def update_collection_item(
     Update only the collection-item fields supplied by the client.
     """
 
+    # Use the same account lock as POST so an add and an edit cannot race.
+    db.query(User).filter(User.id == current_user.id).with_for_update().one()
+
     #Verifies that user owns card before returning
     db_item = (
     db.query(CollectionItem)
@@ -152,6 +155,7 @@ def update_collection_item(
         CollectionItem.id == item_id,          # Match the requested item.
         CollectionItem.user_id == current_user.id,  # Match its owner.
     )
+    .with_for_update()
     .first()  # Return one matching item, or None.
 )
 
@@ -165,6 +169,29 @@ def update_collection_item(
     # client deliberately supplied, including optional fields set to null.
     update_data = item.model_dump(exclude_unset=True)
 
+    # Match the fields used when adding a card. Quantity changes alone
+    # can still be saved on older entries that already have duplicates.
+    current_match = {
+        field: getattr(db_item, field)
+        for field in CollectionItemCreate.model_fields
+        if field != "quantity"
+    }
+    updated_match = {
+        field: update_data.get(field, value)
+        for field, value in current_match.items()
+    }
+    if updated_match != current_match:
+        matching_entry = (
+            db.query(CollectionItem.id)
+            .filter_by(user_id=current_user.id, **updated_match)
+            .filter(CollectionItem.id != item_id)
+            .first()
+        )
+        if matching_entry is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This change would duplicate another collection entry.",
+            )
 
     # setattr() dynamically performs assignments such as:
     # db_item.quantity = 2

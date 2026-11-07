@@ -16,6 +16,8 @@ export type CollectionItemCreate = {
   condition: CardCondition
 }
 
+export type CollectionItemUpdate = Partial<Pick<CollectionItemCreate, 'quantity' | 'condition'>>
+
 // These are the response fields needed for the save step.
 export type CreatedCollectionItem = CollectionItemCreate & {
   id: number
@@ -117,5 +119,41 @@ export async function getCollectionItems(
   }
 
   // This endpoint returns an array directly, without an "items" wrapper.
+  return response.json()
+}
+
+export async function updateCollectionItem(
+  accessToken: string,
+  itemId: number,
+  changes: CollectionItemUpdate,
+): Promise<CollectionItem | null> {
+  let response: Response
+  try {
+    response = await fetch(`/api/collection-items/${itemId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(changes),
+    })
+  } catch {
+    throw new Error('Could not reach Cardfolio. Please try again.')
+  }
+
+  if (response.status === 401) return null
+  if (response.status === 404) {
+    throw new Error('This entry is no longer in your collection. Refresh the page to see your current entries.')
+  }
+  if (response.status === 409) {
+    throw new Error('A matching entry already exists in that condition. Choose another condition or edit the matching entry.')
+  }
+  if (response.status === 422) {
+    throw new Error('Check the quantity and condition, then try again.')
+  }
+  if (!response.ok) {
+    throw new Error('Could not save changes. Please try again.')
+  }
+
   return response.json()
 }
