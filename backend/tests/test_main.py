@@ -1,4 +1,7 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import httpx
 import pytest
 
@@ -331,6 +334,142 @@ def test_create_collection_item_endpoint(auth_account, auth_headers, collection_
 
     with TestingSessionLocal() as db:
         assert db.get(CollectionItem, data["id"]).user_id == auth_account["id"]
+
+
+@pytest.mark.parametrize(
+    "purchase_details",
+    [
+        {},
+        {
+            "purchase_price_per_card": "2.50",
+            "purchase_currency": "CAD",
+            "purchase_date": "2026-01-01",
+            "notes": "Same purchase",
+        },
+    ],
+    ids=["no-purchase-details", "matching-purchase-details"],
+)
+def test_add_matching_collection_item_increases_quantity(
+    auth_headers, collection_variant_id, purchase_details
+):
+    payload = {
+        "card_variant_id": collection_variant_id,
+        "condition": "near_mint",
+        **purchase_details,
+    }
+    first = client.post(
+        "/collection-items", headers=auth_headers, json={**payload, "quantity": 2}
+    )
+    second = client.post(
+        "/collection-items", headers=auth_headers, json={**payload, "quantity": 3}
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    item_id = first.json()["id"]
+    assert second.json()["id"] == item_id
+    assert second.json()["quantity"] == 5
+
+    # Check the saved list as well as the POST response.
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    assert [(item["id"], item["quantity"]) for item in listing.json()] == [(item_id, 5)]
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("card_variant_id", None),
+        ("purchase_price_per_card", "3.50"),
+        ("purchase_currency", "CAD"),
+        ("purchase_date", "2026-01-02"),
+        ("notes", "Different purchase"),
+    ],
+)
+def test_add_collection_item_keeps_distinct_entries_separate(
+    auth_headers, collection_variant_id, field, value
+):
+    if field == "card_variant_id":
+        with TestingSessionLocal() as db:
+            # Use a different finish of the same printing.
+            original = db.get(CardVariant, collection_variant_id)
+            reverse = CardVariant(
+                catalog_card_id=original.catalog_card_id, variant_key="reverse"
+            )
+            db.add(reverse)
+            db.flush()
+            value = reverse.id
+            db.commit()
+
+    payload = {
+        "card_variant_id": collection_variant_id,
+        "condition": "near_mint",
+        "purchase_price_per_card": "2.50",
+        "purchase_currency": "USD",
+        "purchase_date": "2026-01-01",
+        "notes": "First purchase",
+    }
+    first = client.post("/collection-items", headers=auth_headers, json=payload)
+    second = client.post(
+        "/collection-items", headers=auth_headers, json={**payload, field: value}
+    )
+
+    assert first.status_code == second.status_code == 201
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    assert [(item["quantity"], item[field]) for item in listing.json()] == [
+        (1, payload[field]),
+        (1, value),
+    ]
+
+
+def test_concurrent_adds_save_one_collection_entry(auth_headers, collection_variant_id):
+    start = Barrier(2)
+
+    def add(quantity):
+        with TestClient(app) as request_client:
+            # Send two adds together, each using its own request and DB session.
+            start.wait(timeout=10)
+            return request_client.post(
+                "/collection-items",
+                headers=auth_headers,
+                json={
+                    "card_variant_id": collection_variant_id,
+                    "condition": "near_mint",
+                    "quantity": quantity,
+                },
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(add, (2, 3)))
+
+    assert sorted(response.status_code for response in responses) == [200, 201]
+    item_id = responses[0].json()["id"]
+    assert responses[1].json()["id"] == item_id
+
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    assert [(item["id"], item["quantity"]) for item in listing.json()] == [(item_id, 5)]
+
+
+def test_add_matching_collection_item_rejects_combined_quantity_overflow(
+    auth_headers, collection_variant_id
+):
+    payload = {"card_variant_id": collection_variant_id, "condition": "near_mint"}
+    maximum = 2_147_483_647
+    first = client.post(
+        "/collection-items", headers=auth_headers, json={**payload, "quantity": maximum}
+    )
+    assert first.status_code == 201
+    overflow = client.post("/collection-items", headers=auth_headers, json=payload)
+    assert overflow.status_code == 409
+
+    # A rejected merge must leave the original quantity intact.
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert listing.status_code == 200
+    assert [(item["id"], item["quantity"]) for item in listing.json()] == [
+        (first.json()["id"], maximum)
+    ]
 
 
 def test_get_collection_items_paginates_in_id_order(auth_headers):

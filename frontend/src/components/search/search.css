@@ -1,5 +1,4 @@
-/* Search uses the shell's theme tokens. Keep these rules local so collection
-   and authentication layouts don't change when the catalog is refined. */
+/* Search and collection share gallery sizing and the shell's theme tokens. */
 .catalog-search-form {
   margin-top: 30px;
   padding: 24px;
@@ -47,7 +46,7 @@
 .catalog-artwork-missing { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px; color: var(--muted); font-size: 0.8125rem; text-align: center; }
 .catalog-artwork-missing .icon { width: 28px; height: 28px; }
 .catalog-card-copy { padding-top: 15px; padding-bottom: 16px; }
-.catalog-card-copy h3 { margin: 0; font-size: 1rem; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.catalog-card-copy h2, .catalog-card-copy h3 { margin: 0; font-size: 1rem; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
 .catalog-card-copy p { margin-top: 5px; color: var(--muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
 /* Stretch the native button across the artwork and copy without changing
    their layout or adding a second action below each card. */
@@ -106,7 +105,7 @@
   .catalog-start-art { align-self: center; }
   .catalog-start-copy { max-width: none; }
   .catalog-artwork { padding: 8px; }
-  .catalog-card-copy h3 { font-size: 0.9375rem; }
+  .catalog-card-copy h2, .catalog-card-copy h3 { font-size: 0.9375rem; }
   .catalog-feedback { padding: 24px 20px; }
   .catalog-pagination { gap: 12px; }
 }

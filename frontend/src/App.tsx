@@ -1,5 +1,5 @@
 import { AppShell } from './components/AppShell'
-import { CollectionPreview } from './components/CollectionPreview'
+import { CollectionPage } from './pages/CollectionPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { SearchPage } from './pages/SearchPage'
@@ -132,8 +132,11 @@ function App() {
         <Route
           path="/"
           element={
-            accessToken                           // Check whether a token exists.
-              ? <CollectionPreview />             // If yes, show this component.
+            accessToken                    // Check whether a token exists.
+              ? <CollectionPage            // If yes, show this component.
+                accessToken={accessToken}
+                onSessionExpired={handleLogout} 
+              />             
               : <Navigate to="/login" replace />  // Otherwise, redirect to login.
           }
         />

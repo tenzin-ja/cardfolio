@@ -30,43 +30,69 @@ router = APIRouter(
 
 @router.post(
     "",
-    response_model = CollectionItemResponse,
-    status_code = status.HTTP_201_CREATED
+    response_model=CollectionItemResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 def create_collection_item(
     item: CollectionItemCreate,
-    # FastAPI calls get_current_user before executing this function.
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Validate and save one owned collection item
-    """
+    """Create an entry or increase a matching entry's quantity."""
 
-    #a postive ID can pass pydantic vadliation even if that ID does not
-    #belong to a real CardVariant. Checking here gives the client a clear 
-    # 404 response instead of exposing a database Integrity error
     card_variant = db.get(CardVariant, item.card_variant_id)
 
     if card_variant is None:
         raise HTTPException(
-            status_code = status.HTTP_404_NOT_FOUND,
-            detail = "Card variant not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card variant not found",
         )
 
+    # Serialize adds for this account. Without this lock, two requests
+    # could both find no matching entry and create separate rows.
+    db.query(User).filter(
+        User.id == current_user.id,
+    ).with_for_update().one()
 
-    db_item = CollectionItem(
-    # Ownership comes from the authenticated account.
-    user_id=current_user.id,
-    #model_dump() converts the pydantic schema into a dict
-    # ** unpacks that dict into ColectionItem constructor arguements
-    **item.model_dump(),
-)
+    # Match every saved field except quantity. This includes the variant,
+    # condition, purchase information, and notes, preserving distinct records.
+    matching_fields = item.model_dump(exclude={"quantity"})
 
-    db.add(db_item)
+    existing_item = (
+        db.query(CollectionItem)
+        .filter_by(
+            user_id=current_user.id,
+            **matching_fields,
+        )
+        .order_by(CollectionItem.id)
+        .with_for_update()
+        .first()
+    )
+
+    if existing_item is not None:
+        combined_quantity = existing_item.quantity + item.quantity
+
+        # Two individually valid quantities can exceed the database's limit.
+        if combined_quantity > 2_147_483_647:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The combined quantity exceeds the supported limit.",
+            )
+
+        existing_item.quantity = combined_quantity
+        db_item = existing_item
+
+        # Updating an existing entry returns 200; creating one returns 201.
+        response.status_code = status.HTTP_200_OK
+    else:
+        db_item = CollectionItem(
+            user_id=current_user.id,
+            **item.model_dump(),
+        )
+        db.add(db_item)
+
     db.commit()
-
-    # Reload database-generated and default values before returning the object
     db.refresh(db_item)
 
     return db_item

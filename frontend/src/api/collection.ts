@@ -1,3 +1,5 @@
+import type { CatalogImportVariant } from './catalog'
+
 export type CardCondition =
   | 'near_mint'
   | 'lightly_played'
@@ -18,6 +20,25 @@ export type CollectionItemCreate = {
 export type CreatedCollectionItem = CollectionItemCreate & {
   id: number
 }
+
+// "&" combines both sets of fields at the same level.
+// We can read item.quantity, item.condition, and item.id directly.
+export type CollectionItem = CreatedCollectionItem & {
+  card_variant: CatalogImportVariant & {
+    catalog_card: {
+      id: number
+      provider: string
+      provider_card_id: string
+      name: string
+      set_name: string
+      card_number: string
+      rarity: string | null
+      image_url: string | null
+    }
+  }
+}
+
+
 
 export async function createCollectionItem(
   accessToken: string,
@@ -59,5 +80,42 @@ export async function createCollectionItem(
     throw new Error('Could not add this card to your collection.')
   }
 
+  return response.json()
+}
+
+export async function getCollectionItems(
+  accessToken: string,
+  limit = 20,
+  offset = 0,
+): Promise<CollectionItem[] | null> {
+  // Collection pagination uses an offset: 0 starts at the first entry.
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  })
+
+  let response: Response
+
+  try {
+    response = await fetch(`/api/collection-items?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        // The backend returns only the collection belonging to this token.
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+  } catch {
+    throw new Error('Could not reach Cardfolio. Please try again.')
+  }
+
+  if (response.status === 401) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error('Could not load your collection. Please try again.')
+  }
+
+  // This endpoint returns an array directly, without an "items" wrapper.
   return response.json()
 }

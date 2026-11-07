@@ -187,3 +187,9 @@
   .add-card-actions { flex-wrap: nowrap; gap: 8px; }
   .add-card-actions .button-primary { flex: 1; padding-inline: 10px; }
 }
+
+/* The saved card preview uses the inspector grid without a version picker. */
+.collection-card-dialog { max-width: 920px; }
+.collection-card-dialog .add-card-body { align-items: start; }
+.collection-card-dialog .add-card-preview { grid-area: art; }
+.collection-card-dialog .card-facts { gap: 8px; margin-top: 0; }

@@ -188,3 +188,21 @@ install backend requirements, and create the PostgreSQL login and separate
 development/test databases. Configure the ignored `.env` from `.env.example`,
 run `alembic upgrade head` for development, and run the tests. See README for
 the setup commands.
+
+## Release Focus and Deferred Improvements (2026-11-05)
+
+Prioritize a reliable v1 using the existing milestone plan. Reopen completed
+milestones only for a concrete problem. Before a significant architectural
+change, explain why it is necessary before deployment: correctness, security,
+data integrity, or unusually high repair costs after release.
+
+Deferred until after v1:
+
+- A dedicated architecture and performance review, followed by improvements
+  justified by its findings.
+- The optional AI/MCP integration already described in ROADMAP.md.
+
+Current milestone 3 checkpoint: card import is connected, and the user reports
+that saving works on a fresh attempt without the earlier logout. Its original
+cause remains unconfirmed. Next, connect real collection browsing; the current
+collection route still renders illustrative preview data.

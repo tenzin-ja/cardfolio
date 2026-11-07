@@ -180,7 +180,7 @@ export function SearchPage({
     }
   }
 
-
+  //Coordinates saving functions, while also doing error handling
   async function handleAddToCollection(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (saveInFlight.current || isImporting || !importedCard) return
