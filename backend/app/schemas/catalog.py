@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import AwareDatetime, BaseModel, Field, ConfigDict
 
 
 class CatalogVariantSearchResult(BaseModel):
@@ -113,3 +113,16 @@ class CatalogImportResponse(CatalogCardSearchResult):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CatalogPriceObservation(BaseModel):
+    observed_at: AwareDatetime
+    market_price: Decimal
+    currency: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CatalogVariantPriceHistory(BaseModel):
+    card_variant_id: int
+    points: list[CatalogPriceObservation]

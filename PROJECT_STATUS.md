@@ -201,6 +201,7 @@ Deferred until after v1:
 - A dedicated architecture and performance review, followed by improvements
   justified by its findings.
 - The optional AI/MCP integration already described in ROADMAP.md.
+- Evaluate an affordable historical price provider for broader chart coverage on first open.
 
 Current milestone 3 checkpoint: card import is connected, and the user reports
 that saving works on a fresh attempt without the earlier logout. Its original

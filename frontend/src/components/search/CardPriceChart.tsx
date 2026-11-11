@@ -1,19 +1,6 @@
 import { useId, useState } from 'react'
+import type { CardPriceObservation } from '../../api/catalog'
 import { formatCardPrice, readCardPrice } from './card-price'
-import type { CardPrice } from './card-price'
-
-export type CardPriceObservation = {
-  observed_at: string
-  market_price: CardPrice
-  currency: string
-}
-
-// Keep the variant ID with its history so changing versions cannot show the
-// previous version's prices while the next request is still in progress.
-export type VariantPriceHistory = {
-  card_variant_id: number
-  points: CardPriceObservation[]
-}
 
 type CardPriceChartProps = {
   points?: CardPriceObservation[]

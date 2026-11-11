@@ -1,14 +1,18 @@
 import httpx
 
-from fastapi import APIRouter, Query, Depends, HTTPException, status
+from fastapi import APIRouter, Query, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session 
 
 from app.db.database import get_db
+from app.models.card_variant import CardVariant
+from app.models.price_snapshot import PriceSnapshot
 from app.services.catalog_import import import_catalog_card
 from app.schemas.catalog import ( 
     CatalogSearchResponse,
     CatalogImportResponse,
     CatalogImportRequest,
+    CatalogPriceObservation,
+    CatalogVariantPriceHistory,
 )
 from app.services.tcgdex import (
     TCGdexResponseError,
@@ -112,3 +116,27 @@ def import_catalog(
     
     # save only after the provider request and response mapping succeed
     return import_catalog_card(db,provider_card)
+
+
+@router.get("/variants/{variant_id}/price-history", response_model=CatalogVariantPriceHistory)
+def get_variant_price_history(
+    variant_id: int = Path(gt=0, le=2_147_483_647),
+    db: Session = Depends(get_db),
+) -> CatalogVariantPriceHistory:
+    # A real variant can have no observations. Only a missing variant is a 404.
+    if db.get(CardVariant, variant_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card variant not found.",
+        )
+
+    snapshots = (
+        db.query(PriceSnapshot)
+        .filter(PriceSnapshot.card_variant_id == variant_id)
+        .order_by(PriceSnapshot.observed_at, PriceSnapshot.id)
+        .all()
+    )
+    return CatalogVariantPriceHistory(
+        card_variant_id=variant_id,
+        points=[CatalogPriceObservation.model_validate(snapshot) for snapshot in snapshots],
+    )

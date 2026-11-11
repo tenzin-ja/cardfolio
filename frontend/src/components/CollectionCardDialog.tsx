@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import type { CardCondition, CollectionItem, CollectionItemUpdate } from '../api/collection'
+import { useVariantPriceHistory } from '../hooks/useVariantPriceHistory'
 import { Icon } from './Icon'
 import { CardPriceChart } from './search/CardPriceChart'
 import { CatalogArtwork } from './search/SearchResults'
@@ -43,6 +44,7 @@ export function CollectionCardDialog({ item, onClose, onSave, onRemove }: Collec
   const removalId = useId()
   const removalPromptId = useId()
   const variant = item.card_variant
+  const priceHistory = useVariantPriceHistory(variant.id)
   const card = variant.catalog_card
   const version = variant.variant_name || variant.variant_key.replaceAll('_', ' ')
   const hasPrice = readCardPrice(variant.market_price) !== null
@@ -189,7 +191,7 @@ export function CollectionCardDialog({ item, onClose, onSave, onRemove }: Collec
             </div>
             {hasPrice && <span className="card-price-currency">{variant.currency} / card</span>}
           </div>
-          <CardPriceChart currency={variant.currency} />
+          <CardPriceChart {...priceHistory} currency={variant.currency} />
         </section>
 
         <section className="add-card-form" aria-labelledby={detailsId}>

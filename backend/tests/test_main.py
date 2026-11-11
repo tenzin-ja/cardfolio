@@ -312,6 +312,43 @@ def collection_variant_id():
     return variant_id
 
 
+def test_price_history_returns_only_the_selected_variant_in_date_order(collection_variant_id):
+    earlier = datetime(2026, 1, 3, 12, tzinfo=timezone.utc)
+    later = earlier + timedelta(days=5)
+
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        other_variant = CardVariant(catalog_card_id=variant.catalog_card_id, variant_key="normal")
+        # Insert out of date order and include a different printing of the same card.
+        db.add_all([
+            PriceSnapshot(card_variant=variant, market_price=Decimal("25.50"),
+                          currency="USD", source="tcgplayer", observed_at=later),
+            PriceSnapshot(card_variant=variant, market_price=Decimal("0.00"),
+                          currency="USD", source="tcgplayer", observed_at=earlier),
+            PriceSnapshot(card_variant=other_variant, market_price=Decimal("90.00"),
+                          currency="USD", source="tcgplayer", observed_at=earlier),
+        ])
+        db.commit()
+
+    response = client.get(f"/catalog/variants/{collection_variant_id}/price-history")
+
+    assert response.status_code == 200
+    history = response.json()
+    assert history["card_variant_id"] == collection_variant_id
+    assert [point["market_price"] for point in history["points"]] == ["0.00", "25.50"]
+    assert [point["currency"] for point in history["points"]] == ["USD", "USD"]
+    assert [datetime.fromisoformat(point["observed_at"]) for point in history["points"]] == [earlier, later]
+
+
+def test_price_history_distinguishes_empty_history_from_missing_variant(collection_variant_id):
+    empty = client.get(f"/catalog/variants/{collection_variant_id}/price-history")
+    missing = client.get(f"/catalog/variants/{collection_variant_id + 1}/price-history")
+
+    assert empty.status_code == 200
+    assert empty.json() == {"card_variant_id": collection_variant_id, "points": []}
+    assert missing.status_code == 404
+
+
 def test_create_collection_item_endpoint(auth_account, auth_headers, collection_variant_id):
     response = client.post(
         "/collection-items",

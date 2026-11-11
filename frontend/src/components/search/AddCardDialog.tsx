@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { SubmitEvent, SubmitEventHandler } from 'react'
+import { useVariantPriceHistory } from '../../hooks/useVariantPriceHistory'
 import { Icon } from '../Icon'
 import { CatalogArtwork } from './SearchResults'
 import type { CatalogCardSummary } from './SearchResults'
 import { CardPriceChart } from './CardPriceChart'
-import type { VariantPriceHistory } from './CardPriceChart'
 import { formatCardPrice, readCardPrice } from './card-price'
 import type { CardPrice } from './card-price'
 import './add-card.css'
@@ -30,11 +30,6 @@ type AddCardDialogProps = {
   importError?: string | null
   isSaving?: boolean
   saveError?: string | null
-  priceHistory?: VariantPriceHistory | null
-  isHistoryLoading?: boolean
-  historyError?: string | null
-  onRetryHistory?: () => void
-  onVariantChange?: (variantId: number) => void
   onRetryImport?: () => void
   onSubmit?: SubmitEventHandler<HTMLFormElement>
   onClose: () => void
@@ -47,11 +42,6 @@ export function AddCardDialog({
   importError = null,
   isSaving = false,
   saveError = null,
-  priceHistory = null,
-  isHistoryLoading = false,
-  historyError = null,
-  onRetryHistory,
-  onVariantChange,
   onRetryImport,
   onSubmit,
   onClose,
@@ -70,15 +60,13 @@ export function AddCardDialog({
   // Start with the first returned version, then keep the visitor's choice.
   // The same selection controls the price, chart, and submitted variant ID.
   const selectedVariant = variants.find(variant => variant.id === selectedVariantId) ?? variants[0]
+  const priceHistory = useVariantPriceHistory(selectedVariant?.id)
   const currency = selectedVariant?.currency ?? 'USD'
   // Zero is a valid price; only missing or invalid values show the message.
   const hasReferencePrice = readCardPrice(selectedVariant?.market_price) !== null
   const variantName = selectedVariant
     ? selectedVariant.variant_name || selectedVariant.variant_key.replaceAll('_', ' ')
     : 'Version unavailable'
-  const historyPoints = selectedVariant?.id === priceHistory?.card_variant_id
-    ? priceHistory?.points
-    : undefined
   const fieldsDisabled = isImporting || isSaving || Boolean(importError) || !variants.length
   const canSubmit = Boolean(onSubmit) && !fieldsDisabled
 
@@ -162,10 +150,7 @@ export function AddCardDialog({
                         the artwork column sits outside that form in the layout. */}
                     <input type="radio" name="card_variant_id" form={formId}
                       value={variant.id} checked={selectedVariant?.id === variant.id}
-                      onChange={() => {
-                        setSelectedVariantId(variant.id)
-                        onVariantChange?.(variant.id)
-                      }} required />
+                      onChange={() => setSelectedVariantId(variant.id)} required />
                     <span className="card-version-name">{variant.variant_name || variant.variant_key.replaceAll('_', ' ')}</span>
                     <span className="card-version-price">{formatCardPrice(variant.market_price, variant.currency ?? 'USD')}</span>
                     <span className="card-version-marker" aria-hidden="true" />
@@ -190,9 +175,8 @@ export function AddCardDialog({
               </div>
               {hasReferencePrice && <span className="card-price-currency">{currency} / card</span>}
             </div>
-            <CardPriceChart points={historyPoints} currency={currency}
-              isLoading={isImporting || isHistoryLoading}
-              error={historyError} onRetry={onRetryHistory} />
+            <CardPriceChart {...priceHistory} currency={currency}
+              isLoading={isImporting || priceHistory.isLoading} />
           </section>
 
         <form

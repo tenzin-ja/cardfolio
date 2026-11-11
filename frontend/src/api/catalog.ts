@@ -31,6 +31,17 @@ export type CatalogImportResponse = CatalogCardSummary & {
   variants: CatalogImportVariant[]
 }
 
+export type CardPriceObservation = {
+  observed_at: string
+  market_price: string
+  currency: string
+}
+
+type VariantPriceHistory = {
+  card_variant_id: number
+  points: CardPriceObservation[]
+}
+
 // Search the catalog and return a complete page of results.
 // Start at page 1 unless the caller requests another page.
 export async function searchCatalog(
@@ -112,4 +123,16 @@ export async function importCatalogCard(
   }
 
   return response.json()
+}
+
+export async function getVariantPriceHistory(
+  variantId: number,
+  signal: AbortSignal,
+): Promise<VariantPriceHistory> {
+  const response = await fetch(`/api/catalog/variants/${variantId}/price-history`, { signal })
+  if (!response.ok) throw new Error('Could not load price history.')
+
+  const history: VariantPriceHistory = await response.json()
+  if (history.card_variant_id !== variantId) throw new Error('Price history belongs to a different version.')
+  return history
 }
