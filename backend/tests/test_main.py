@@ -596,6 +596,156 @@ def test_get_collection_items_rejects_negative_offset(auth_headers):
     assert response.json()["detail"][0]["loc"] == ["query", "offset"]
 
 
+@pytest.mark.parametrize("authorization", [None, "Bearer invalid-token"])
+def test_collection_summary_requires_authentication(auth_account, authorization):
+    headers = {"Authorization": authorization} if authorization else {}
+    response = client.get("/collection-items/summary", headers=headers)
+
+    assert response.status_code == 401
+
+
+def test_collection_summary_returns_empty_totals(auth_headers):
+    response = client.get("/collection-items/summary", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_quantity": 0,
+        "priced_quantity": 0,
+        "unpriced_quantity": 0,
+        "totals_by_currency": [],
+    }
+
+
+def test_collection_summary_uses_owned_quantities_and_separate_currencies(
+    auth_account, auth_headers, collection_variant_id
+):
+    registration = client.post(
+        "/auth/register",
+        json={"email": "other@example.com", "password": "other-test-passphrase"},
+    )
+    assert registration.status_code == 201
+    other_user_id = registration.json()["id"]
+
+    with TestingSessionLocal() as db:
+        first = db.get(CardVariant, collection_variant_id)
+        first.market_price = Decimal("2.50")
+        second = CardVariant(
+            catalog_card_id=first.catalog_card_id, variant_key="normal",
+            market_price=Decimal("10.00"), currency="USD",
+        )
+        unpriced = CardVariant(
+            catalog_card_id=first.catalog_card_id, variant_key="reverse", currency="USD",
+        )
+        euros = CardVariant(
+            catalog_card_id=first.catalog_card_id, variant_key="euro", currency="EUR",
+            market_price=Decimal("1.20"),
+        )
+        db.add_all([
+            # Purchase cost and condition do not change the shared reference price.
+            CollectionItem(user_id=auth_account["id"], card_variant=first, quantity=3,
+                           condition="damaged", purchase_price_per_card=Decimal("999.00")),
+            CollectionItem(user_id=auth_account["id"], card_variant=second, quantity=2,
+                           condition="near_mint"),
+            CollectionItem(user_id=auth_account["id"], card_variant=unpriced, quantity=1,
+                           condition="near_mint"),
+            CollectionItem(user_id=auth_account["id"], card_variant=euros, quantity=4,
+                           condition="near_mint"),
+            # Both users can own the same printing, with independent quantities.
+            CollectionItem(user_id=other_user_id, card_variant=second, quantity=7,
+                           condition="near_mint"),
+            PriceSnapshot(card_variant=first, market_price=Decimal("100.00"), source="tcgplayer"),
+        ])
+        db.commit()
+
+    response = client.get("/collection-items/summary", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_quantity": 10,
+        "priced_quantity": 9,
+        "unpriced_quantity": 1,
+        "totals_by_currency": [
+            {"currency": "EUR", "estimated_value": "4.80"},
+            {"currency": "USD", "estimated_value": "27.50"},
+        ],
+    }
+
+    other_login = client.post(
+        "/auth/login",
+        json={"email": "other@example.com", "password": "other-test-passphrase"},
+    )
+    assert other_login.status_code == 200
+    other_summary = client.get(
+        "/collection-items/summary",
+        headers={"Authorization": f"Bearer {other_login.json()['access_token']}"},
+    )
+    assert other_summary.status_code == 200
+    assert other_summary.json() == {
+        "total_quantity": 7,
+        "priced_quantity": 7,
+        "unpriced_quantity": 0,
+        "totals_by_currency": [{"currency": "USD", "estimated_value": "70.00"}],
+    }
+
+
+@pytest.mark.parametrize(
+    "price, priced_quantity, totals",
+    [
+        (None, 0, []),
+        (Decimal("0.00"), 3, [{"currency": "USD", "estimated_value": "0.00"}]),
+    ],
+    ids=["missing-price", "known-zero-price"],
+)
+def test_collection_summary_distinguishes_missing_and_zero_prices(
+    auth_account, auth_headers, collection_variant_id, price, priced_quantity, totals
+):
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        variant.market_price = price
+        db.add(CollectionItem(
+            user_id=auth_account["id"], card_variant=variant, condition="near_mint", quantity=3,
+        ))
+        db.commit()
+
+    response = client.get("/collection-items/summary", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_quantity": 3,
+        "priced_quantity": priced_quantity,
+        "unpriced_quantity": 3 - priced_quantity,
+        "totals_by_currency": totals,
+    }
+
+
+def test_collection_summary_includes_entries_beyond_the_first_page(
+    auth_account, auth_headers, collection_variant_id
+):
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        variant.market_price = Decimal("0.10")
+        db.add_all([
+            CollectionItem(
+                user_id=auth_account["id"], card_variant=variant, condition="near_mint",
+                quantity=2, notes=f"Separate purchase {index}",
+            )
+            for index in range(21)
+        ])
+        db.commit()
+
+    listing = client.get("/collection-items", headers=auth_headers)
+    assert len(listing.json()) == 20
+    summary = client.get("/collection-items/summary", headers=auth_headers)
+
+    assert summary.status_code == 200
+    assert summary.json() == {
+        "total_quantity": 42,
+        "priced_quantity": 42,
+        "unpriced_quantity": 0,
+        "totals_by_currency": [{"currency": "USD", "estimated_value": "4.20"}],
+    }
+
+
 def test_update_collection_item_changes_only_supplied_fields(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",

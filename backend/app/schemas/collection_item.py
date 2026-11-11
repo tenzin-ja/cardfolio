@@ -128,3 +128,16 @@ class CollectionItemResponse(CollectionItemCreate):
 
     #pydantic reads this relationship and uses the nested response schema
     card_variant: CollectionVariantResponse
+
+
+class CollectionCurrencyTotal(BaseModel):
+    currency: str
+    estimated_value: Decimal = Field(ge=0)
+
+
+class CollectionSummaryResponse(BaseModel):
+    # Quantities count physical copies, including entries with several copies.
+    total_quantity: int = Field(ge=0)
+    priced_quantity: int = Field(ge=0)
+    unpriced_quantity: int = Field(ge=0)
+    totals_by_currency: list[CollectionCurrencyTotal]

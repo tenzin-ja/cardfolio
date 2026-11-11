@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -6,6 +8,7 @@ from fastapi import (
     Response,
     status,
 )
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 
@@ -16,6 +19,8 @@ from app.schemas.collection_item import(
     CollectionItemCreate,
     CollectionItemResponse,
     CollectionItemUpdate,
+    CollectionCurrencyTotal,
+    CollectionSummaryResponse,
 )
 # Reuse the dependency that validates tokens and retrieves the account.
 from app.dependencies import get_current_user
@@ -129,6 +134,50 @@ def get_collection_items(
         .limit(limit)
         .all()
     )
+
+
+@router.get("/summary", response_model=CollectionSummaryResponse)
+def get_collection_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CollectionSummaryResponse:
+    """Summarize every saved copy owned by the signed-in user."""
+    rows = (
+        db.query(
+            CardVariant.currency,
+            func.sum(CollectionItem.quantity).label("total_quantity"),
+            # A known zero-dollar price still counts as priced.
+            func.sum(case(
+                (CardVariant.market_price.is_not(None), CollectionItem.quantity),
+                else_=0,
+            )).label("priced_quantity"),
+            func.coalesce(
+                func.sum(CollectionItem.quantity * CardVariant.market_price),
+                Decimal("0.00"),
+            ).label("estimated_value"),
+        )
+        .join(CardVariant, CollectionItem.card_variant_id == CardVariant.id)
+        .filter(CollectionItem.user_id == current_user.id)
+        # Aggregate in PostgreSQL across the full collection, by currency.
+        .group_by(CardVariant.currency)
+        .order_by(CardVariant.currency)
+        .all()
+    )
+
+    total_quantity = sum(row.total_quantity for row in rows)
+    priced_quantity = sum(row.priced_quantity for row in rows)
+    return CollectionSummaryResponse(
+        total_quantity=total_quantity,
+        priced_quantity=priced_quantity,
+        unpriced_quantity=total_quantity - priced_quantity,
+        totals_by_currency=[
+            CollectionCurrencyTotal(currency=row.currency, estimated_value=row.estimated_value)
+            for row in rows
+            # An entirely unpriced currency has no known value to return.
+            if row.priced_quantity > 0
+        ],
+    )
+
 
 @router.patch(
     "/{item_id}",
