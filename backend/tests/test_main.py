@@ -49,9 +49,12 @@ from app.db.database import Base, get_db
 from app.models.catalog_card import CatalogCard
 from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
+from app.models.collection_value_snapshot import CollectionValueSnapshot
 from app.models.price_snapshot import PriceSnapshot
 from app.main import app
 from app.routers import catalog as catalog_router
+from app.routers import collection_items as collection_router
+from app.services import collection_values
 from app.services.tcgdex import TCGdexResponseError
 from app.services.catalog_import import import_catalog_card
 from app.schemas.catalog import(
@@ -460,7 +463,7 @@ def test_add_collection_item_keeps_distinct_entries_separate(
     ]
 
 
-def test_concurrent_adds_save_one_collection_entry(auth_headers, collection_variant_id):
+def test_concurrent_adds_save_one_collection_entry(auth_headers, collection_variant_id, snapshot_clock):
     start = Barrier(2)
 
     def add(quantity):
@@ -487,6 +490,9 @@ def test_concurrent_adds_save_one_collection_entry(auth_headers, collection_vari
     listing = client.get("/collection-items", headers=auth_headers)
     assert listing.status_code == 200
     assert [(item["id"], item["quantity"]) for item in listing.json()] == [(item_id, 5)]
+    with TestingSessionLocal() as db:
+        snapshot = db.query(CollectionValueSnapshot).one()
+        assert snapshot.total_quantity == 5
 
 
 def test_add_matching_collection_item_rejects_combined_quantity_overflow(
@@ -746,6 +752,189 @@ def test_collection_summary_includes_entries_beyond_the_first_page(
     }
 
 
+@pytest.fixture
+def snapshot_clock(monkeypatch):
+    current = datetime(2026, 11, 11, 23, 59, tzinfo=timezone.utc)
+
+    class SnapshotDateTime:
+        @staticmethod
+        def now(tz):
+            return current.astimezone(tz)
+
+    def set_time(value):
+        nonlocal current
+        current = value
+
+    monkeypatch.setattr(collection_values, "datetime", SnapshotDateTime)
+    return set_time
+
+
+def test_collection_changes_update_today_and_preserve_previous_utc_days(
+    auth_headers, collection_variant_id, snapshot_clock
+):
+    with TestingSessionLocal() as db:
+        db.get(CardVariant, collection_variant_id).market_price = Decimal("2.50")
+        db.commit()
+
+    payload = {"card_variant_id": collection_variant_id, "condition": "near_mint", "quantity": 2}
+    created = client.post("/collection-items", headers=auth_headers, json=payload)
+    assert created.status_code == 201
+    item_id = created.json()["id"]
+    with TestingSessionLocal() as db:
+        first_id = db.query(CollectionValueSnapshot).one().id
+
+    added = client.post("/collection-items", headers=auth_headers, json=payload)
+    assert added.status_code == 200
+    with TestingSessionLocal() as db:
+        today = db.query(CollectionValueSnapshot).one()
+        assert today.id == first_id
+        assert today.total_quantity == today.priced_quantity == 4
+        assert today.unpriced_quantity == 0
+        assert today.estimated_value == Decimal("10.00")
+
+    # This local date is still Nov 11, but the UTC day has become Nov 12.
+    snapshot_clock(datetime(2026, 11, 11, 17, 1, tzinfo=timezone(timedelta(hours=-7))))
+    updated = client.patch(f"/collection-items/{item_id}", headers=auth_headers, json={"quantity": 1})
+    assert updated.status_code == 200
+    with TestingSessionLocal() as db:
+        yesterday, today = db.query(CollectionValueSnapshot).order_by(CollectionValueSnapshot.snapshot_date).all()
+        assert yesterday.id == first_id
+        assert yesterday.snapshot_date.isoformat() == "2026-11-11"
+        assert yesterday.estimated_value == Decimal("10.00")
+        assert yesterday.total_quantity == 4
+        assert today.snapshot_date.isoformat() == "2026-11-12"
+        assert today.observed_at == datetime(2026, 11, 12, 0, 1, tzinfo=timezone.utc)
+        assert today.estimated_value == Decimal("2.50")
+        assert today.total_quantity == 1
+
+
+@pytest.mark.parametrize("legacy_entry", [False, True])
+def test_last_card_deletion_records_zero_even_without_previous_history(
+    auth_account, auth_headers, collection_variant_id, snapshot_clock, legacy_entry
+):
+    if legacy_entry:
+        with TestingSessionLocal() as db:
+            item = CollectionItem(user_id=auth_account["id"], card_variant_id=collection_variant_id,
+                                  condition="near_mint", quantity=2)
+            db.add(item)
+            db.commit()
+            item_id = item.id
+    else:
+        created = client.post("/collection-items", headers=auth_headers, json={
+            "card_variant_id": collection_variant_id, "condition": "near_mint", "quantity": 2,
+        })
+        assert created.status_code == 201
+        item_id = created.json()["id"]
+
+    removed = client.delete(f"/collection-items/{item_id}", headers=auth_headers)
+    assert removed.status_code == 204
+    with TestingSessionLocal() as db:
+        snapshot = db.query(CollectionValueSnapshot).one()
+        assert snapshot.currency == "USD"
+        assert snapshot.total_quantity == snapshot.priced_quantity == snapshot.unpriced_quantity == 0
+        assert snapshot.estimated_value == Decimal("0.00")
+
+
+def test_snapshots_keep_currency_coverage_and_carry_removed_currencies_as_zero(
+    auth_headers, collection_variant_id, snapshot_clock
+):
+    with TestingSessionLocal() as db:
+        first = db.get(CardVariant, collection_variant_id)
+        euros = CardVariant(catalog_card_id=first.catalog_card_id, variant_key="euro",
+                            market_price=Decimal("1.20"), currency="EUR")
+        zero = CardVariant(catalog_card_id=first.catalog_card_id, variant_key="zero",
+                           market_price=Decimal("0.00"), currency="USD")
+        db.add_all([euros, zero])
+        db.commit()
+        euro_id, zero_id = euros.id, zero.id
+
+    items = []
+    for variant_id, quantity in [(collection_variant_id, 3), (euro_id, 2), (zero_id, 1)]:
+        response = client.post("/collection-items", headers=auth_headers, json={
+            "card_variant_id": variant_id, "condition": "near_mint", "quantity": quantity,
+        })
+        assert response.status_code == 201
+        items.append(response.json()["id"])
+
+    with TestingSessionLocal() as db:
+        euro, usd = db.query(CollectionValueSnapshot).order_by(CollectionValueSnapshot.currency).all()
+        assert (euro.currency, euro.total_quantity, euro.priced_quantity, euro.estimated_value) == (
+            "EUR", 2, 2, Decimal("2.40"),
+        )
+        assert (usd.total_quantity, usd.priced_quantity, usd.unpriced_quantity, usd.estimated_value) == (
+            4, 1, 3, Decimal("0.00"),
+        )
+
+    assert client.delete(f"/collection-items/{items[2]}", headers=auth_headers).status_code == 204
+    with TestingSessionLocal() as db:
+        usd = db.query(CollectionValueSnapshot).filter_by(currency="USD").one()
+        assert (usd.total_quantity, usd.priced_quantity, usd.unpriced_quantity, usd.estimated_value) == (3, 0, 3, None)
+
+    assert client.delete(f"/collection-items/{items[1]}", headers=auth_headers).status_code == 204
+    with TestingSessionLocal() as db:
+        euro = db.query(CollectionValueSnapshot).filter_by(currency="EUR").one()
+        assert euro.total_quantity == 0
+        assert euro.estimated_value == Decimal("0.00")
+
+
+@pytest.mark.parametrize("action", ["add", "merge", "edit", "delete"])
+def test_snapshot_failure_rolls_back_the_collection_change(
+    auth_headers, collection_variant_id, snapshot_clock, monkeypatch, action
+):
+    with TestingSessionLocal() as db:
+        db.get(CardVariant, collection_variant_id).market_price = Decimal("2.50")
+        db.commit()
+    created = client.post("/collection-items", headers=auth_headers, json={
+        "card_variant_id": collection_variant_id, "condition": "near_mint", "quantity": 2,
+    })
+    assert created.status_code == 201
+    item_id = created.json()["id"]
+    original_record = collection_router.record_collection_value_snapshots
+
+    def fail_after_recording(db, *args, **kwargs):
+        original_record(db, *args, **kwargs)
+        db.flush()
+        raise RuntimeError("Simulated snapshot failure")
+
+    monkeypatch.setattr(collection_router, "record_collection_value_snapshots", fail_after_recording)
+    with pytest.raises(RuntimeError, match="Simulated snapshot failure"):
+        if action in {"add", "merge"}:
+            client.post("/collection-items", headers=auth_headers, json={
+                "card_variant_id": collection_variant_id,
+                "condition": "damaged" if action == "add" else "near_mint", "quantity": 1,
+            })
+        elif action == "edit":
+            client.patch(f"/collection-items/{item_id}", headers=auth_headers, json={"quantity": 9})
+        else:
+            client.delete(f"/collection-items/{item_id}", headers=auth_headers)
+
+    with TestingSessionLocal() as db:
+        item = db.query(CollectionItem).one()
+        snapshot = db.query(CollectionValueSnapshot).one()
+        assert item.id == item_id
+        assert item.quantity == snapshot.total_quantity == 2
+        assert snapshot.estimated_value == Decimal("5.00")
+
+
+def test_snapshot_totals_support_quantities_and_values_larger_than_one_entry(
+    auth_headers, collection_variant_id, snapshot_clock
+):
+    maximum_quantity = 2_147_483_647
+    price = Decimal("99999999.99")
+    with TestingSessionLocal() as db:
+        db.get(CardVariant, collection_variant_id).market_price = price
+        db.commit()
+    for condition in ["near_mint", "damaged"]:
+        response = client.post("/collection-items", headers=auth_headers, json={
+            "card_variant_id": collection_variant_id, "condition": condition, "quantity": maximum_quantity,
+        })
+        assert response.status_code == 201
+    with TestingSessionLocal() as db:
+        snapshot = db.query(CollectionValueSnapshot).one()
+        assert snapshot.total_quantity == snapshot.priced_quantity == maximum_quantity * 2
+        assert snapshot.estimated_value == price * maximum_quantity * 2
+
+
 def test_update_collection_item_changes_only_supplied_fields(auth_headers):
     catalog_card = CatalogCard(
         provider="tcgdex",
@@ -933,7 +1122,7 @@ def test_collection_routes_require_authentication(
         assert saved_items[0].user_id == auth_account["id"]
 
 
-def test_collection_items_are_private_between_users(auth_headers, collection_variant_id):
+def test_collection_items_are_private_between_users(auth_headers, collection_variant_id, snapshot_clock):
     registration = client.post(
         "/auth/register",
         json={"email": "other@example.com", "password": "another-practice-passphrase"},
@@ -998,6 +1187,14 @@ def test_collection_items_are_private_between_users(auth_headers, collection_var
     assert remaining.status_code == 200
     assert [item["id"] for item in remaining.json()] == [second_id]
     assert remaining.json()[0]["card_variant_id"] == collection_variant_id
+    with TestingSessionLocal() as db:
+        first_snapshot, other_snapshot = (
+            db.query(CollectionValueSnapshot).order_by(CollectionValueSnapshot.user_id).all()
+        )
+        assert first_snapshot.total_quantity == 0
+        assert first_snapshot.estimated_value == Decimal("0.00")
+        assert other_snapshot.total_quantity == 1
+        assert other_snapshot.estimated_value is None
 
 
 def test_collection_item_owner_cannot_be_set_or_changed_by_client(

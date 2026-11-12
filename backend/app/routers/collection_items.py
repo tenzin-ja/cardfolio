@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -8,7 +6,6 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 
@@ -26,6 +23,7 @@ from app.schemas.collection_item import(
 from app.dependencies import get_current_user
 # The database model representing that account.
 from app.models.user import User
+from app.services.collection_values import get_collection_totals, record_collection_value_snapshots
 
 # The prefix is automatically added to every route defined in this file.
 router = APIRouter(
@@ -97,6 +95,7 @@ def create_collection_item(
         )
         db.add(db_item)
 
+    record_collection_value_snapshots(db, current_user.id)
     db.commit()
     db.refresh(db_item)
 
@@ -142,27 +141,7 @@ def get_collection_summary(
     db: Session = Depends(get_db),
 ) -> CollectionSummaryResponse:
     """Summarize every saved copy owned by the signed-in user."""
-    rows = (
-        db.query(
-            CardVariant.currency,
-            func.sum(CollectionItem.quantity).label("total_quantity"),
-            # A known zero-dollar price still counts as priced.
-            func.sum(case(
-                (CardVariant.market_price.is_not(None), CollectionItem.quantity),
-                else_=0,
-            )).label("priced_quantity"),
-            func.coalesce(
-                func.sum(CollectionItem.quantity * CardVariant.market_price),
-                Decimal("0.00"),
-            ).label("estimated_value"),
-        )
-        .join(CardVariant, CollectionItem.card_variant_id == CardVariant.id)
-        .filter(CollectionItem.user_id == current_user.id)
-        # Aggregate in PostgreSQL across the full collection, by currency.
-        .group_by(CardVariant.currency)
-        .order_by(CardVariant.currency)
-        .all()
-    )
+    rows = get_collection_totals(db, current_user.id)
 
     total_quantity = sum(row.total_quantity for row in rows)
     priced_quantity = sum(row.priced_quantity for row in rows)
@@ -248,6 +227,8 @@ def update_collection_item(
     for field, value in update_data.items():
         setattr(db_item, field, value)
 
+    if update_data:
+        record_collection_value_snapshots(db, current_user.id)
     db.commit()
     db.refresh(db_item)
 
@@ -269,6 +250,7 @@ def delete_collection_item(
     Delete one owned collection item
     """
 
+    db.query(User).filter(User.id == current_user.id).with_for_update().one()
     #Same thing, verify user and item match before deleting
     db_item = (
         db.query(CollectionItem)
@@ -285,7 +267,9 @@ def delete_collection_item(
         )   
     #This removes only the owned CollectionItem. Its shared CaardVariant and 
     # CatalogCard remain avaliable 
+    previous_currency = db_item.card_variant.currency
     db.delete(db_item)
+    record_collection_value_snapshots(db, current_user.id, previous_currencies=(previous_currency,))
     db.commit()
 
     # A successful 204 response intentionally conatains no JSON body

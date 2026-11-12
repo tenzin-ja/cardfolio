@@ -202,8 +202,11 @@ Deferred until after v1:
   justified by its findings.
 - The optional AI/MCP integration already described in ROADMAP.md.
 - Evaluate an affordable historical price provider for broader chart coverage on first open.
+- Capture more frequent collection-value updates driven by shared reference-price changes.
 
-Current milestone 3 checkpoint: card import is connected, and the user reports
-that saving works on a fresh attempt without the earlier logout. Its original
-cause remains unconfirmed. Next, connect real collection browsing; the current
-collection route still renders illustrative preview data.
+Current milestone 3 checkpoint: collection browsing, pagination, add/edit/delete,
+and stored card-price history are connected. Collection changes now save daily
+UTC value snapshots in the same transaction, with separate currencies and price
+coverage. Today's snapshot updates in place; the final deletion records zero.
+Next, add the daily capture command, then include history in the summary response
+before connecting the portfolio graph.
