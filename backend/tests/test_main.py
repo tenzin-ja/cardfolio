@@ -623,6 +623,7 @@ def test_collection_summary_returns_empty_totals(auth_headers):
         "priced_quantity": 0,
         "unpriced_quantity": 0,
         "totals_by_currency": [],
+        "history": [],
     }
 
 
@@ -678,6 +679,7 @@ def test_collection_summary_uses_owned_quantities_and_separate_currencies(
             {"currency": "EUR", "estimated_value": "4.80"},
             {"currency": "USD", "estimated_value": "27.50"},
         ],
+        "history": [],
     }
 
     other_login = client.post(
@@ -695,6 +697,7 @@ def test_collection_summary_uses_owned_quantities_and_separate_currencies(
         "priced_quantity": 7,
         "unpriced_quantity": 0,
         "totals_by_currency": [{"currency": "USD", "estimated_value": "70.00"}],
+        "history": [],
     }
 
 
@@ -725,6 +728,7 @@ def test_collection_summary_distinguishes_missing_and_zero_prices(
         "priced_quantity": priced_quantity,
         "unpriced_quantity": 3 - priced_quantity,
         "totals_by_currency": totals,
+        "history": [],
     }
 
 
@@ -753,7 +757,81 @@ def test_collection_summary_includes_entries_beyond_the_first_page(
         "priced_quantity": 42,
         "unpriced_quantity": 0,
         "totals_by_currency": [{"currency": "USD", "estimated_value": "4.20"}],
+        "history": [],
     }
+
+
+def test_summary_returns_all_owned_history_in_date_and_currency_order(
+    auth_account, auth_headers, collection_variant_id
+):
+    start = datetime(2024, 1, 1, 12, tzinfo=timezone.utc)
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        variant.market_price = Decimal("2.50")
+        db.add(CollectionItem(user_id=auth_account["id"], card_variant=variant,
+                              condition="near_mint", quantity=3))
+        # Insert older dates out of order to catch accidental recent-history limits.
+        for index in reversed(range(35)):
+            observed_at = start + timedelta(days=index)
+            total_quantity = priced_quantity = 2
+            value = Decimal("1.00") + index
+            if index == 8:
+                total_quantity = priced_quantity = 0
+                value = Decimal("0.00")
+            elif index == 17:
+                priced_quantity = 0
+                value = None
+            db.add(CollectionValueSnapshot(
+                user_id=auth_account["id"], snapshot_date=observed_at.date(),
+                observed_at=observed_at, currency="USD", estimated_value=value,
+                total_quantity=total_quantity, priced_quantity=priced_quantity,
+                unpriced_quantity=total_quantity - priced_quantity,
+            ))
+        db.add(CollectionValueSnapshot(
+            user_id=auth_account["id"], snapshot_date=start.date(), observed_at=start,
+            currency="EUR", estimated_value=Decimal("3.33"),
+            total_quantity=1, priced_quantity=1, unpriced_quantity=0,
+        ))
+        other_user = User(email="other-history@example.com", password_hash="unused-test-hash")
+        db.add(other_user)
+        db.flush()
+        other_user_id = other_user.id
+        db.add(CollectionValueSnapshot(
+            user_id=other_user_id, snapshot_date=start.date(), observed_at=start,
+            currency="USD", estimated_value=Decimal("999.00"),
+            total_quantity=1, priced_quantity=1, unpriced_quantity=0,
+        ))
+        db.commit()
+
+    response = client.get("/collection-items/summary", headers=auth_headers,
+                          params={"user_id": other_user_id})
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_quantity"] == summary["priced_quantity"] == 3
+    assert summary["totals_by_currency"] == [{"currency": "USD", "estimated_value": "7.50"}]
+    history = summary["history"]
+    expected_keys = sorted(
+        [((start + timedelta(days=index)).date().isoformat(), "USD") for index in range(35)]
+        + [(start.date().isoformat(), "EUR")]
+    )
+    assert [(point["snapshot_date"], point["currency"]) for point in history] == expected_keys
+    first_point = history[0].copy()
+    # PostgreSQL may serialize the same instant with the connection's timezone offset.
+    assert datetime.fromisoformat(first_point.pop("observed_at")) == start
+    assert first_point == {
+        "snapshot_date": "2024-01-01",
+        "currency": "EUR", "estimated_value": "3.33",
+        "total_quantity": 1, "priced_quantity": 1, "unpriced_quantity": 0,
+    }
+    usd_points = {point["snapshot_date"]: point for point in history if point["currency"] == "USD"}
+    assert usd_points["2024-01-09"]["estimated_value"] == "0.00"
+    assert usd_points["2024-01-09"]["total_quantity"] == 0
+    assert usd_points["2024-01-18"]["estimated_value"] is None
+    assert usd_points["2024-01-18"]["unpriced_quantity"] == 2
+    assert history[-1]["estimated_value"] == "35.00"
+    with TestingSessionLocal() as db:
+        # A summary read returns observations without adding or changing history.
+        assert db.query(CollectionValueSnapshot).count() == 37
 
 
 @pytest.fixture
@@ -811,6 +889,10 @@ def test_collection_changes_update_today_and_preserve_previous_utc_days(
         assert today.estimated_value == Decimal("2.50")
         assert today.total_quantity == 1
 
+    summary = client.get("/collection-items/summary", headers=auth_headers)
+    assert summary.status_code == 200
+    assert [point["estimated_value"] for point in summary.json()["history"]] == ["10.00", "2.50"]
+
 
 @pytest.mark.parametrize("legacy_entry", [False, True])
 def test_last_card_deletion_records_zero_even_without_previous_history(
@@ -837,6 +919,11 @@ def test_last_card_deletion_records_zero_even_without_previous_history(
         assert snapshot.currency == "USD"
         assert snapshot.total_quantity == snapshot.priced_quantity == snapshot.unpriced_quantity == 0
         assert snapshot.estimated_value == Decimal("0.00")
+
+    summary = client.get("/collection-items/summary", headers=auth_headers)
+    assert summary.status_code == 200
+    assert summary.json()["total_quantity"] == 0
+    assert summary.json()["history"][0]["estimated_value"] == "0.00"
 
 
 def test_snapshots_keep_currency_coverage_and_carry_removed_currencies_as_zero(

@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 #Restricts API input to the same condtion values permitted by the database
 CardCondition = Literal [
@@ -135,9 +135,23 @@ class CollectionCurrencyTotal(BaseModel):
     estimated_value: Decimal = Field(ge=0)
 
 
+class CollectionValueHistoryPoint(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    snapshot_date: date
+    observed_at: AwareDatetime
+    currency: str
+    estimated_value: Decimal | None = Field(ge=0)
+    # Historical quantities describe only this point's currency.
+    total_quantity: int = Field(ge=0)
+    priced_quantity: int = Field(ge=0)
+    unpriced_quantity: int = Field(ge=0)
+
+
 class CollectionSummaryResponse(BaseModel):
     # Quantities count physical copies, including entries with several copies.
     total_quantity: int = Field(ge=0)
     priced_quantity: int = Field(ge=0)
     unpriced_quantity: int = Field(ge=0)
     totals_by_currency: list[CollectionCurrencyTotal]
+    history: list[CollectionValueHistoryPoint]

@@ -12,12 +12,14 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.database import get_db
 from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
+from app.models.collection_value_snapshot import CollectionValueSnapshot
 from app.schemas.collection_item import(
     CollectionItemCreate,
     CollectionItemResponse,
     CollectionItemUpdate,
     CollectionCurrencyTotal,
     CollectionSummaryResponse,
+    CollectionValueHistoryPoint,
 )
 # Reuse the dependency that validates tokens and retrieves the account.
 from app.dependencies import get_current_user
@@ -140,8 +142,14 @@ def get_collection_summary(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CollectionSummaryResponse:
-    """Summarize every saved copy owned by the signed-in user."""
+    """Return current collection totals and all recorded history for this user."""
     rows = get_collection_totals(db, current_user.id)
+    history = (
+        db.query(CollectionValueSnapshot)
+        .filter(CollectionValueSnapshot.user_id == current_user.id)
+        .order_by(CollectionValueSnapshot.snapshot_date, CollectionValueSnapshot.currency)
+        .all()
+    )
 
     total_quantity = sum(row.total_quantity for row in rows)
     priced_quantity = sum(row.priced_quantity for row in rows)
@@ -155,6 +163,8 @@ def get_collection_summary(
             # An entirely unpriced currency has no known value to return.
             if row.priced_quantity > 0
         ],
+        # Return stored observations, including unknown values and zero after removal.
+        history=[CollectionValueHistoryPoint.model_validate(snapshot) for snapshot in history],
     )
 
 
