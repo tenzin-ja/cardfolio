@@ -1,5 +1,8 @@
 import os
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Barrier
 
 import httpx
@@ -46,6 +49,7 @@ if (
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app.db.database import Base, get_db
+from app.commands import capture_collection_values as capture_values_command
 from app.models.catalog_card import CatalogCard
 from app.models.card_variant import CardVariant
 from app.models.collection_item import CollectionItem
@@ -933,6 +937,144 @@ def test_snapshot_totals_support_quantities_and_values_larger_than_one_entry(
         snapshot = db.query(CollectionValueSnapshot).one()
         assert snapshot.total_quantity == snapshot.priced_quantity == maximum_quantity * 2
         assert snapshot.estimated_value == price * maximum_quantity * 2
+
+
+def test_daily_capture_selects_tracked_accounts_and_safely_refreshes_today(
+    auth_account, collection_variant_id, snapshot_clock, monkeypatch, caplog
+):
+    monkeypatch.setattr(capture_values_command, "SessionLocal", TestingSessionLocal)
+    caplog.set_level("INFO", logger=capture_values_command.logger.name)
+    earlier = datetime(2026, 11, 10, 12, tzinfo=timezone.utc)
+    today = datetime(2026, 11, 11, tzinfo=timezone.utc).date()
+
+    with TestingSessionLocal() as db:
+        priced = db.get(CardVariant, collection_variant_id)
+        priced.market_price = Decimal("2.50")
+        unpriced = CardVariant(catalog_card_id=priced.catalog_card_id, variant_key="unpriced")
+        emptied = User(email="emptied@example.com", password_hash="unused-test-hash")
+        new_account = User(email="new@example.com", password_hash="unused-test-hash")
+        unpriced_owner = User(email="unpriced@example.com", password_hash="unused-test-hash")
+        db.add_all([emptied, new_account, unpriced_owner])
+        db.flush()
+        emptied_id, new_id, unpriced_owner_id = emptied.id, new_account.id, unpriced_owner.id
+        db.add_all([
+            CollectionItem(user_id=auth_account["id"], card_variant=priced, condition="near_mint", quantity=3),
+            CollectionItem(user_id=unpriced_owner_id, card_variant=unpriced, condition="near_mint", quantity=1),
+            CollectionValueSnapshot(
+                user_id=emptied_id, snapshot_date=earlier.date(), observed_at=earlier,
+                currency="USD", total_quantity=2, priced_quantity=2, unpriced_quantity=0,
+                estimated_value=Decimal("5.00"),
+            ),
+        ])
+        db.commit()
+
+    assert capture_values_command.main() == 0
+    assert "Selected=3 succeeded=3 failed=0" in caplog.text
+    with TestingSessionLocal() as db:
+        snapshots = {
+            row.user_id: row for row in db.query(CollectionValueSnapshot).filter_by(snapshot_date=today)
+        }
+        assert set(snapshots) == {auth_account["id"], emptied_id, unpriced_owner_id}
+        assert snapshots[auth_account["id"]].estimated_value == Decimal("7.50")
+        assert snapshots[emptied_id].total_quantity == 0
+        assert snapshots[emptied_id].estimated_value == Decimal("0.00")
+        assert snapshots[unpriced_owner_id].unpriced_quantity == 1
+        assert snapshots[unpriced_owner_id].estimated_value is None
+        assert db.query(CollectionValueSnapshot).filter_by(user_id=new_id).count() == 0
+        original_ids = {user_id: row.id for user_id, row in snapshots.items()}
+        # A scheduled run picks up stored price updates even without a collection edit.
+        db.get(CardVariant, collection_variant_id).market_price = Decimal("3.00")
+        db.commit()
+
+    assert capture_values_command.main() == 0
+    with TestingSessionLocal() as db:
+        snapshots = db.query(CollectionValueSnapshot).filter_by(snapshot_date=today).all()
+        assert {row.user_id: row.id for row in snapshots} == original_ids
+        active = next(row for row in snapshots if row.user_id == auth_account["id"])
+        assert active.estimated_value == Decimal("9.00")
+        previous = db.query(CollectionValueSnapshot).filter_by(snapshot_date=earlier.date()).one()
+        assert previous.estimated_value == Decimal("5.00")
+
+
+def test_daily_capture_rolls_back_one_account_and_continues_with_later_accounts(
+    auth_account, collection_variant_id, snapshot_clock, monkeypatch, caplog
+):
+    monkeypatch.setattr(capture_values_command, "SessionLocal", TestingSessionLocal)
+    caplog.set_level("INFO", logger=capture_values_command.logger.name)
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        variant.market_price = Decimal("2.50")
+        failing_user = User(email="failing@example.com", password_hash="unused-test-hash")
+        later_user = User(email="later@example.com", password_hash="unused-test-hash")
+        db.add_all([failing_user, later_user])
+        db.flush()
+        failed_id, later_id = failing_user.id, later_user.id
+        db.add_all([
+            CollectionItem(user_id=user_id, card_variant=variant, condition="near_mint", quantity=quantity)
+            for user_id, quantity in [(auth_account["id"], 2), (failed_id, 4), (later_id, 6)]
+        ])
+        db.commit()
+
+    record = capture_values_command.record_collection_value_snapshots
+
+    def fail_one_account(db, user_id):
+        record(db, user_id)
+        db.flush()
+        if user_id == failed_id:
+            raise RuntimeError("Simulated account capture failure")
+
+    monkeypatch.setattr(capture_values_command, "record_collection_value_snapshots", fail_one_account)
+    assert capture_values_command.main() == 1
+    assert f"failed for user_id={failed_id}" in caplog.text
+    assert "Selected=3 succeeded=2 failed=1" in caplog.text
+    with TestingSessionLocal() as db:
+        snapshots = {row.user_id: row for row in db.query(CollectionValueSnapshot)}
+        assert set(snapshots) == {auth_account["id"], later_id}
+        assert snapshots[auth_account["id"]].estimated_value == Decimal("5.00")
+        assert snapshots[later_id].estimated_value == Decimal("15.00")
+        original_ids = {user_id: row.id for user_id, row in snapshots.items()}
+
+    # A retry fills in the failed account and updates successful accounts in place.
+    monkeypatch.setattr(capture_values_command, "record_collection_value_snapshots", record)
+    assert capture_values_command.main() == 0
+    with TestingSessionLocal() as db:
+        snapshots = {row.user_id: row for row in db.query(CollectionValueSnapshot)}
+        assert set(snapshots) == {auth_account["id"], failed_id, later_id}
+        assert snapshots[failed_id].estimated_value == Decimal("10.00")
+        assert all(snapshots[user_id].id == snapshot_id for user_id, snapshot_id in original_ids.items())
+
+
+def test_daily_capture_reports_failure_if_accounts_cannot_be_loaded(monkeypatch, caplog):
+    def unavailable_database():
+        raise RuntimeError("Test database unavailable")
+
+    monkeypatch.setattr(capture_values_command, "SessionLocal", unavailable_database)
+    assert capture_values_command.main() == 1
+    assert "Could not load accounts" in caplog.text
+
+
+def test_daily_capture_module_runs_as_a_command(auth_account, collection_variant_id):
+    with TestingSessionLocal() as db:
+        variant = db.get(CardVariant, collection_variant_id)
+        variant.market_price = Decimal("1.25")
+        db.add(CollectionItem(user_id=auth_account["id"], card_variant=variant,
+                              condition="near_mint", quantity=2))
+        db.commit()
+
+    result = subprocess.run(
+        [sys.executable, "-m", "app.commands.capture_collection_values"],
+        cwd=Path(__file__).resolve().parents[1],
+        # The command's own engine must use the guarded test database too.
+        env={**os.environ, "DATABASE_URL": TEST_DATABASE_URL, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True, text=True, timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Selected=1 succeeded=1 failed=0" in result.stderr
+    with TestingSessionLocal() as db:
+        snapshot = db.query(CollectionValueSnapshot).one()
+        assert snapshot.user_id == auth_account["id"]
+        assert snapshot.total_quantity == 2
+        assert snapshot.estimated_value == Decimal("2.50")
 
 
 def test_update_collection_item_changes_only_supplied_fields(auth_headers):
