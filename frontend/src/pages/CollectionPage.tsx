@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { deleteCollectionItem, getCollectionItems, updateCollectionItem } from '../api/collection'
 import type { CollectionItem, CollectionItemUpdate } from '../api/collection'
+import type { CatalogImportResponse } from '../api/catalog'
 import { CollectionCardDialog } from '../components/CollectionCardDialog'
 import { CollectionValueOverview } from '../components/CollectionValueOverview'
 import { useCollectionSummary } from '../hooks/useCollectionSummary'
@@ -37,6 +38,7 @@ export function CollectionPage({
   const [error, setError] = useState<string | null>(null)
   const addCardLink = useRef<HTMLAnchorElement>(null)
   const focusAfterRemoval = useRef(false)
+  const priceRevision = useRef(0)
   // Read the selected entry from the page we already loaded.
   const selectedItem = items.find(item => item.id === selectedItemId)
   // Current TCGdex reference prices are in USD. Never add other currencies to it.
@@ -102,6 +104,7 @@ export function CollectionPage({
   }, [selectedItemId])
 
   async function handleSaveItem(itemId: number, changes: CollectionItemUpdate) {
+    const revisionAtSave = priceRevision.current
     const updatedItem = await updateCollectionItem(accessToken, itemId, changes)
     if (updatedItem === null) {
       onSessionExpired()
@@ -109,11 +112,29 @@ export function CollectionPage({
     }
 
     // The dialog and grid read from the same list, so both update in place.
-    setItems(current => current.map(item => item.id === itemId ? updatedItem : item))
+    setItems(current => current.map(item => {
+      if (item.id !== itemId) return item
+      // A slower save response must not replace prices that refreshed meanwhile.
+      return priceRevision.current === revisionAtSave
+        ? updatedItem
+        : { ...updatedItem, card_variant: item.card_variant }
+    }))
     // The save already succeeded. A later summary error belongs to the overview.
     refreshSummary()
     return updatedItem
   }
+
+  const handleCatalogRefreshed = useCallback((card: CatalogImportResponse) => {
+    priceRevision.current += 1
+    setItems(current => current.map(item => {
+      if (item.card_variant.catalog_card.id !== card.id) return item
+      const variant = card.variants.find(variant => variant.id === item.card_variant.id)
+      if (!variant) return item
+      // Conditions and quantities belong to the collection entry, not the catalog.
+      return { ...item, card_variant: { ...item.card_variant, ...variant } }
+    }))
+    refreshSummary()
+  }, [refreshSummary])
 
   async function handleRemoveItem(itemId: number) {
     const removed = await deleteCollectionItem(accessToken, itemId)
@@ -293,7 +314,9 @@ export function CollectionPage({
       )}
       {selectedItem && (
         <CollectionCardDialog
+          key={selectedItem.id}
           item={selectedItem}
+          onCatalogRefreshed={handleCatalogRefreshed}
           onClose={() => setSelectedItemId(null)}
           onSave={changes => handleSaveItem(selectedItem.id, changes)}
           onRemove={() => handleRemoveItem(selectedItem.id)}

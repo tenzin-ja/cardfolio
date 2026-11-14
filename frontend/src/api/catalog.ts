@@ -88,6 +88,7 @@ export async function searchCatalog(
 
 export async function importCatalogCard(
   providerCardId: string,
+  signal?: AbortSignal,
 ): Promise<CatalogImportResponse> {
   let response: Response
 
@@ -104,6 +105,7 @@ export async function importCatalogCard(
       body: JSON.stringify({
         provider_card_id: providerCardId,
       }),
+      signal,
     })
   } catch {
     // fetch throws for connection failures, not ordinary HTTP error responses.

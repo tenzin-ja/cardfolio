@@ -222,3 +222,8 @@ and deletions refresh the summary; returning from Search loads it again. It reta
 the last successful values with explicit feedback after a refresh failure, discards
 cancelled requests, and follows the existing session-expiration behavior. Sample
 data has been removed. Price coverage details remain temporarily for testing.
+Opening a saved card now reuses `POST /catalog/import` to check provider prices.
+It updates matching visible versions, reloads stored card-price history after the
+import completes, and refreshes the collection summary. Provider failures leave
+saved details editable with an explicit warning and retry. Price history still
+records changes only; an unchanged price does not add a daily observation.

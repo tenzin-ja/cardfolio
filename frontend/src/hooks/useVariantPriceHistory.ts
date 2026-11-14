@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getVariantPriceHistory } from '../api/catalog'
 import type { CardPriceObservation } from '../api/catalog'
 
@@ -29,10 +29,11 @@ export function useVariantPriceHistory(variantId: number | undefined) {
   }, [request])
 
   const currentResult = result?.request === request ? result : null
+  const onRetry = useCallback(() => setRetryAttempt(attempt => attempt + 1), [])
   return {
     points: currentResult?.points,
     error: currentResult?.error,
     isLoading: variantId !== undefined && currentResult === null,
-    onRetry: () => setRetryAttempt(attempt => attempt + 1),
+    onRetry,
   }
 }

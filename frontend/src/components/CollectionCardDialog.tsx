@@ -1,6 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { SubmitEvent } from 'react'
 import type { CardCondition, CollectionItem, CollectionItemUpdate } from '../api/collection'
+import { importCatalogCard } from '../api/catalog'
+import type { CatalogImportResponse } from '../api/catalog'
 import { useVariantPriceHistory } from '../hooks/useVariantPriceHistory'
 import { Icon } from './Icon'
 import { CardPriceChart } from './search/CardPriceChart'
@@ -13,6 +15,7 @@ type CollectionCardDialogProps = {
   onClose: () => void
   onSave: (changes: CollectionItemUpdate) => Promise<CollectionItem | null>
   onRemove: () => Promise<void>
+  onCatalogRefreshed: (card: CatalogImportResponse) => void
 }
 
 const conditionOptions: { value: CardCondition; label: string }[] = [
@@ -25,7 +28,7 @@ const conditionOptions: { value: CardCondition; label: string }[] = [
 ]
 const MAX_QUANTITY = 2_147_483_647
 
-export function CollectionCardDialog({ item, onClose, onSave, onRemove }: CollectionCardDialogProps) {
+export function CollectionCardDialog({ item, onClose, onSave, onRemove, onCatalogRefreshed }: CollectionCardDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const removeButtonRef = useRef<HTMLButtonElement>(null)
   const keepEntryRef = useRef<HTMLButtonElement>(null)
@@ -46,12 +49,56 @@ export function CollectionCardDialog({ item, onClose, onSave, onRemove }: Collec
   const variant = item.card_variant
   const priceHistory = useVariantPriceHistory(variant.id)
   const card = variant.catalog_card
+  const [priceRefreshAttempt, setPriceRefreshAttempt] = useState(0)
+  const refreshRequest = useMemo(() => ({
+    catalogCardId: card.id,
+    provider: card.provider,
+    providerCardId: card.provider_card_id,
+    variantId: variant.id,
+    attempt: priceRefreshAttempt,
+  }), [card.id, card.provider, card.provider_card_id, variant.id, priceRefreshAttempt])
+  const [refreshResult, setRefreshResult] = useState<{
+    request: typeof refreshRequest
+    error?: string
+  } | null>(null)
+  const isRefreshingPrice = refreshResult?.request !== refreshRequest
+  const priceRefreshError = refreshResult?.request === refreshRequest ? refreshResult.error : null
+  const reloadHistory = priceHistory.onRetry
   const version = variant.variant_name || variant.variant_key.replaceAll('_', ' ')
   const hasPrice = readCardPrice(variant.market_price) !== null
   const draftQuantity = Number(quantityDraft)
   const canStepQuantity = Number.isInteger(draftQuantity) && draftQuantity >= 1 && draftQuantity <= MAX_QUANTITY
   const isBusy = pendingAction !== null
   const editDisabled = isBusy || isConfirmingRemoval
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void importCatalogCard(refreshRequest.providerCardId, controller.signal)
+      .then(refreshed => {
+        if (controller.signal.aborted) return
+        if (refreshed.id !== refreshRequest.catalogCardId
+          || refreshed.provider !== refreshRequest.provider
+          || refreshed.provider_card_id !== refreshRequest.providerCardId
+          || !refreshed.variants.some(variant => variant.id === refreshRequest.variantId)) {
+          throw new Error('The catalog returned a different card or version.')
+        }
+        onCatalogRefreshed(refreshed)
+        // Import commits any new price observation before we request history again.
+        reloadHistory()
+        setRefreshResult({ request: refreshRequest })
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return
+        setRefreshResult({
+          request: refreshRequest,
+          error: error instanceof Error ? error.message : 'Could not refresh reference prices.',
+        })
+      })
+
+    // Closing or replacing this dialog discards late results. Cancelling the
+    // browser request does not undo an import already committed by the backend.
+    return () => controller.abort()
+  }, [refreshRequest, onCatalogRefreshed, reloadHistory])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -191,6 +238,14 @@ export function CollectionCardDialog({ item, onClose, onSave, onRemove }: Collec
             </div>
             {hasPrice && <span className="card-price-currency">{variant.currency} / card</span>}
           </div>
+          {isRefreshingPrice && <p className="collection-price-status" role="status">Checking latest reference price…</p>}
+          {!isRefreshingPrice && !priceRefreshError && <p className="collection-price-checked" role="status">Reference price checked.</p>}
+          {priceRefreshError && (
+            <div className="collection-price-feedback" role="alert">
+              <p>{priceRefreshError} Showing saved values.</p>
+              <button className="add-card-retry" type="button" onClick={() => setPriceRefreshAttempt(attempt => attempt + 1)}>Try price refresh again</button>
+            </div>
+          )}
           <CardPriceChart {...priceHistory} currency={variant.currency} />
         </section>
 
