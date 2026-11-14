@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { deleteCollectionItem, getCollectionItems, updateCollectionItem } from '../api/collection'
 import type { CollectionItem, CollectionItemUpdate } from '../api/collection'
 import { CollectionCardDialog } from '../components/CollectionCardDialog'
+import { CollectionValueOverview } from '../components/CollectionValueOverview'
+import { collectionValuePreview } from '../components/collection-value-preview'
 import { PageHeader } from '../components/PageHeader'
 import { CatalogArtwork } from '../components/search/SearchResults'
 import { formatCardPrice } from '../components/search/card-price'
@@ -133,6 +135,10 @@ export function CollectionPage({
           </Link>
         }
       />
+
+      {/* The UI preview uses sample values until we connect the summary API.
+          Vite removes this development-only panel from production builds. */}
+      {import.meta.env.DEV && <CollectionValueOverview {...collectionValuePreview} />}
 
       {isLoading && <p role="status">Loading your collection…</p>}
 

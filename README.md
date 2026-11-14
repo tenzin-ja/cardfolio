@@ -71,6 +71,7 @@ cardfolio/
 | `POST` | `/catalog/import` | Import a provider card and return local card and variant IDs |
 | `POST` | `/collection-items` | Save an owned copy using a local `card_variant_id` |
 | `GET` | `/collection-items` | List collection items with related card details and optional `limit` |
+| `GET` | `/collection-items/summary` | Return the signed-in user's current totals and all recorded value history |
 | `PATCH` | `/collection-items/{item_id}` | Update condition, quantity, purchase information, or notes |
 | `DELETE` | `/collection-items/{item_id}` | Delete a collection item while preserving its catalog card and variant |
 | `POST` | `/cards` | Create a standalone card record |
@@ -97,6 +98,14 @@ Then use an `id` from the returned `variants` list as `card_variant_id` in
 provider's card ID and opaque variant key. Collection responses nest variant
 information under `card_variant` and card details under
 `card_variant.catalog_card`.
+
+The authenticated summary response includes current copy counts,
+`totals_by_currency`, and a `history` array ordered by `snapshot_date`, then
+`currency`. Each historical point contains the UTC calendar date, timezone-aware
+`observed_at` timestamp, currency, `estimated_value`, and total/priced/unpriced
+copy counts for that currency. Monetary values are decimal strings. A historical
+value of `null` means all owned copies in that currency were unpriced;
+`"0.00"` is a known zero. Accounts with no recorded snapshots receive `history: []`.
 
 Collection listing returns up to 20 items by default, with a maximum `limit` of
 100. Catalog search accepts `page` and `page_size`; its `total_count` is `null`
@@ -219,6 +228,26 @@ Tokens expire after 30 minutes; sign in again to obtain a new token. Clearing
 authorization in Swagger removes its local token. Bearer-token authentication
 is currently enforced on `/auth/me`; per-user collection access is part of the
 planned scope below.
+
+## Capturing Daily Collection Values
+
+From `backend`, with PostgreSQL running, migrations applied, and the virtual
+environment active, run the capture command using the configured `DATABASE_URL`.
+
+```bash
+# Record or refresh today's UTC snapshots for accounts with cards or existing history.
+python -m app.commands.capture_collection_values
+```
+
+The command uses stored reference prices and saves each account in its own
+transaction. An account failure rolls back that account and processing continues.
+Logs report selected, successful, and failed account counts. Exit status `0`
+means success, including when no accounts need processing. Exit status `1`
+means an account failed or accounts could not be loaded. Repeating a run updates
+the same day's records in place and preserves previous UTC days.
+
+During deployment, configure the platform's scheduler to execute this command
+once per day from `backend`, using the backend's database configuration.
 
 ## Running the Tests
 

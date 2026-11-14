@@ -144,7 +144,7 @@ export function SearchPage({
     }
   }
 
-  //Coordinator for when a card is clicked
+  //Co    ordinator for when a card is clicked
   //Calls importcatalogcard to recieve info from backend, and handles errors
   async function handleSelectCard(card: CatalogCardSummary) {
   const version = ++importRequestVersion.current

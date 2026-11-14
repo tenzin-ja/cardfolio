@@ -208,5 +208,15 @@ Current milestone 3 checkpoint: collection browsing, pagination, add/edit/delete
 and stored card-price history are connected. Collection changes now save daily
 UTC value snapshots in the same transaction, with separate currencies and price
 coverage. Today's snapshot updates in place; the final deletion records zero.
-Next, add the daily capture command, then include history in the summary response
-before connecting the portfolio graph.
+The daily capture command is available as
+`python -m app.commands.capture_collection_values` from `backend`. It captures
+accounts with cards or existing history, uses a separate transaction per account,
+continues after individual failures, and reports a nonzero exit status if any fail.
+Connect it to the deployment platform's scheduler during deployment.
+The authenticated summary response now includes all recorded value history,
+ordered by UTC date and currency, alongside the current totals. Historical
+points retain currency-specific copy counts, known zero values, and unknown values.
+The collection-value graph UI is available above the collection cards in development,
+using labeled sample data. It supports both themes and range selection; price
+coverage details are temporarily retained for testing. Next, connect the summary
+response to this graph and replace the development preview with real account data.
