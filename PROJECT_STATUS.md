@@ -216,7 +216,9 @@ Connect it to the deployment platform's scheduler during deployment.
 The authenticated summary response now includes all recorded value history,
 ordered by UTC date and currency, alongside the current totals. Historical
 points retain currency-specific copy counts, known zero values, and unknown values.
-The collection-value graph UI is available above the collection cards in development,
-using labeled sample data. It supports both themes and range selection; price
-coverage details are temporarily retained for testing. Next, connect the summary
-response to this graph and replace the development preview with real account data.
+The collection-value graph now loads real account totals and history through
+`useCollectionSummary`, independently of the paginated card list. Successful edits
+and deletions refresh the summary; returning from Search loads it again. It retains
+the last successful values with explicit feedback after a refresh failure, discards
+cancelled requests, and follows the existing session-expiration behavior. Sample
+data has been removed. Price coverage details remain temporarily for testing.

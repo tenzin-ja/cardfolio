@@ -4,7 +4,7 @@ import { deleteCollectionItem, getCollectionItems, updateCollectionItem } from '
 import type { CollectionItem, CollectionItemUpdate } from '../api/collection'
 import { CollectionCardDialog } from '../components/CollectionCardDialog'
 import { CollectionValueOverview } from '../components/CollectionValueOverview'
-import { collectionValuePreview } from '../components/collection-value-preview'
+import { useCollectionSummary } from '../hooks/useCollectionSummary'
 import { PageHeader } from '../components/PageHeader'
 import { CatalogArtwork } from '../components/search/SearchResults'
 import { formatCardPrice } from '../components/search/card-price'
@@ -21,6 +21,13 @@ export function CollectionPage({
   accessToken,
   onSessionExpired,
 }: CollectionPageProps) {
+  const {
+    summary,
+    loadedAt,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+    refresh: refreshSummary,
+  } = useCollectionSummary(accessToken, onSessionExpired)
   const [page, setPage] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [retryAttempt, setRetryAttempt] = useState(0)
@@ -32,6 +39,11 @@ export function CollectionPage({
   const focusAfterRemoval = useRef(false)
   // Read the selected entry from the page we already loaded.
   const selectedItem = items.find(item => item.id === selectedItemId)
+  // Current TCGdex reference prices are in USD. Never add other currencies to it.
+  const currency = 'USD'
+  const currencyTotal = summary?.totals_by_currency.find(total => total.currency === currency)
+  // An empty collection is worth zero. A nonempty, entirely unpriced one is unknown.
+  const estimatedValue = currencyTotal?.estimated_value ?? (summary?.total_quantity === 0 ? '0.00' : null)
 
   useEffect(() => {
     // Ignore a pending response after leaving the page or changing accounts.
@@ -98,6 +110,8 @@ export function CollectionPage({
 
     // The dialog and grid read from the same list, so both update in place.
     setItems(current => current.map(item => item.id === itemId ? updatedItem : item))
+    // The save already succeeded. A later summary error belongs to the overview.
+    refreshSummary()
     return updatedItem
   }
 
@@ -111,6 +125,7 @@ export function CollectionPage({
     focusAfterRemoval.current = true
     setSelectedItemId(null)
     setItems(current => current.filter(item => item.id !== itemId))
+    refreshSummary()
 
     // Reload to fill the empty slot and get the correct Next button state.
     if (page > 1 && items.length === 1 && !hasNextPage) {
@@ -136,9 +151,28 @@ export function CollectionPage({
         }
       />
 
-      {/* The UI preview uses sample values until we connect the summary API.
-          Vite removes this development-only panel from production builds. */}
-      {import.meta.env.DEV && <CollectionValueOverview {...collectionValuePreview} />}
+      {summary ? (
+        <CollectionValueOverview
+          currency={currency}
+          estimatedValue={estimatedValue}
+          totalQuantity={summary.total_quantity}
+          pricedQuantity={summary.priced_quantity}
+          unpricedQuantity={summary.unpriced_quantity}
+          history={summary.history}
+          asOf={loadedAt}
+          isRefreshing={isSummaryLoading}
+          error={summaryError}
+          onRetry={refreshSummary}
+        />
+      ) : (
+        <section className="collection-value-overview collection-value-pending" aria-label="Collection value" aria-busy={isSummaryLoading}>
+          <header className="collection-value-heading"><h2>Collection value</h2></header>
+          <div className="collection-value-feedback" role={summaryError ? 'alert' : 'status'}>
+            <p>{summaryError ?? 'Loading collection value…'}</p>
+            {summaryError && <button className="button" type="button" onClick={refreshSummary}>Try again</button>}
+          </div>
+        </section>
+      )}
 
       {isLoading && <p role="status">Loading your collection…</p>}
 

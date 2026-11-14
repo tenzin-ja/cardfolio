@@ -1,17 +1,8 @@
 import { useId, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
+import type { CollectionValueHistoryPoint } from '../api/collection'
 import { formatCardPrice, readCardPrice } from './search/card-price'
 import './collection-value.css'
-
-export type CollectionValueHistoryPoint = {
-  snapshot_date: string
-  observed_at: string
-  currency: string
-  estimated_value: string | null
-  total_quantity: number
-  priced_quantity: number
-  unpriced_quantity: number
-}
 
 export type CollectionValueOverviewProps = {
   currency: string
@@ -20,7 +11,10 @@ export type CollectionValueOverviewProps = {
   pricedQuantity: number
   unpricedQuantity: number
   history: readonly CollectionValueHistoryPoint[]
-  isPreview?: boolean
+  asOf?: number
+  isRefreshing?: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 type Observation = {
@@ -51,16 +45,16 @@ function dateLabel(timestamp: number, includeYear = false) {
 
 export function CollectionValueOverview({
   currency, estimatedValue, totalQuantity, pricedQuantity, unpricedQuantity,
-  history, isPreview = false,
+  history, asOf, isRefreshing = false, error = null, onRetry,
 }: CollectionValueOverviewProps) {
   const id = useId()
   const [range, setRange] = useState<number | null>(30)
   const [activeDate, setActiveDate] = useState<string | null>(null)
   const [keyboardReadout, setKeyboardReadout] = useState('')
-  const [today] = useState(() => {
-    const now = new Date()
-    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  })
+  const [mountedAt] = useState(() => Date.now())
+  // A response loaded after UTC midnight advances the range window too.
+  const referenceTime = new Date(asOf ?? mountedAt)
+  const today = Date.UTC(referenceTime.getUTCFullYear(), referenceTime.getUTCMonth(), referenceTime.getUTCDate())
 
   const observations: Observation[] = history.flatMap(point => {
     const timestamp = Date.parse(`${point.snapshot_date}T00:00:00Z`)
@@ -75,7 +69,6 @@ export function CollectionValueOverview({
   const priced = visible.filter((point): point is PricedObservation => point.value !== null)
   const first = visible[0]
   const last = visible.at(-1)
-  const latest = observations.at(-1)
   const selected = visible.find(point => point.date === activeDate) ?? last
 
   const prices = priced.map(point => point.value)
@@ -167,10 +160,17 @@ export function CollectionValueOverview({
       <header className="collection-value-heading">
         <div>
           <h2 id={id + '-heading'}>Collection value</h2>
-          {isPreview && <span className="collection-value-preview-label">Development preview · sample data</span>}
         </div>
-        {latest && <p>As of <time dateTime={latest.date}>{dateLabel(latest.timestamp)}</time> · UTC</p>}
+        {asOf !== undefined && <p>Loaded <time dateTime={new Date(asOf).toISOString()}>{dateLabel(asOf)}</time> · UTC</p>}
       </header>
+
+      {isRefreshing && <p className="collection-value-refresh-status" role="status">Updating collection value…</p>}
+      {error && (
+        <div className="collection-value-refresh-error" role="alert">
+          <p>{error} Showing the last loaded values.</p>
+          {onRetry && <button className="button" type="button" onClick={onRetry}>Try again</button>}
+        </div>
+      )}
 
       <div className="collection-value-headline">
         <p className="collection-value-label">Estimated value <span>{currency}</span></p>

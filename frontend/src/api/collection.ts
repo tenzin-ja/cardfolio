@@ -40,6 +40,50 @@ export type CollectionItem = CreatedCollectionItem & {
   }
 }
 
+// FastAPI sends Decimal amounts as strings; the UI converts them for display only.
+export type CollectionValueHistoryPoint = {
+  snapshot_date: string
+  observed_at: string
+  currency: string
+  estimated_value: string | null
+  total_quantity: number
+  priced_quantity: number
+  unpriced_quantity: number
+}
+
+export type CollectionSummary = {
+  total_quantity: number
+  priced_quantity: number
+  unpriced_quantity: number
+  totals_by_currency: { currency: string; estimated_value: string }[]
+  history: CollectionValueHistoryPoint[]
+}
+
+export async function getCollectionSummary(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<CollectionSummary | null> {
+  let response: Response
+
+  try {
+    response = await fetch('/api/collection-items/summary', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    })
+  } catch (error) {
+    // Let the hook discard a cancelled request without showing a network error.
+    if (signal?.aborted) throw error
+    throw new Error('Could not reach Cardfolio. Please try again.')
+  }
+
+  if (response.status === 401) return null
+  if (!response.ok) {
+    throw new Error('Could not load your collection value. Please try again.')
+  }
+
+  return response.json()
+}
+
 
 
 export async function createCollectionItem(

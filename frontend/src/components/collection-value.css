@@ -14,7 +14,11 @@
 .collection-value-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; }
 .collection-value-heading > div { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; }
 .collection-value-heading h2 { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.015em; }
-.collection-value-heading > p, .collection-value-preview-label { color: var(--muted); font-size: 0.75rem; }
+.collection-value-heading > p { color: var(--muted); font-size: 0.75rem; }
+.collection-value-pending .collection-value-feedback { min-height: 340px; }
+.collection-value-refresh-status { margin-top: 14px; color: var(--muted); font-size: 0.8125rem; }
+.collection-value-refresh-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 16px; }
+.collection-value-refresh-error p { max-width: 65ch; color: var(--muted); font-size: 0.8125rem; }
 .collection-value-headline { margin-top: 25px; }
 .collection-value-label { color: var(--muted); font-size: 0.8125rem; }
 .collection-value-label span { margin-left: 7px; font-size: 0.6875rem; }
